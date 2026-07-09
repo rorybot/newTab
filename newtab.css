@@ -1,0 +1,49 @@
+﻿:root {
+  color-scheme: dark;
+  --bg: #0c0b0a;
+  --bg-elevated: #161412;
+  --border: #2a2520;
+  --text: #e8e0d4;
+  --text-muted: #9a8f82;
+  --accent: #c4a574;
+  --accent-soft: rgba(196, 165, 116, 0.15);
+  --danger: #c47a6a;
+  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "Cascadia Code", "Consolas", "SF Mono", ui-monospace, monospace;
+  --radius: 14px;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+body {
+  font-family: var(--font-sans);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(196, 165, 116, 0.08), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(80, 60, 40, 0.2), transparent 50%),
+    var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+.page { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem 3rem; min-height: 100vh; display: flex; flex-direction: column; gap: 2.5rem; }
+.top-bar { display: flex; align-items: center; justify-content: space-between; }
+.clock { font-family: var(--font-mono); font-size: 0.95rem; letter-spacing: 0.04em; color: var(--text-muted); }
+.icon-btn { appearance: none; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); width: 2.25rem; height: 2.25rem; border-radius: 999px; cursor: pointer; font-size: 1rem; }
+.icon-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 40vh; }
+.eyebrow { margin: 0 0 0.75rem; text-transform: uppercase; letter-spacing: 0.22em; font-size: 0.75rem; color: var(--text-muted); }
+.age-display { margin: 0; font-family: var(--font-mono); font-size: clamp(2.4rem, 7vw, 4.5rem); font-weight: 500; font-variant-numeric: tabular-nums; }
+.age-label { margin: 0.85rem 0 0; font-size: 1rem; color: var(--text-muted); }
+.death-countdown { margin: 1.5rem 0 0; font-size: 0.95rem; color: var(--danger); }
+.death-countdown[hidden] { display: none; }
+.settings-dialog { border: 1px solid var(--border); border-radius: calc(var(--radius) + 2px); background: var(--bg-elevated); color: var(--text); padding: 0; max-width: 22rem; width: calc(100% - 2rem); box-shadow: var(--shadow); }
+.settings-dialog::backdrop { background: rgba(0, 0, 0, 0.65); }
+.settings-form { display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem; }
+.settings-form h2 { margin: 0 0 0.25rem; font-size: 1.15rem; }
+.field { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem; color: var(--text-muted); }
+.field input[type="date"], .field input[type="time"], .field input[type="number"] { appearance: none; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 8px; padding: 0.55rem 0.7rem; font: inherit; }
+.checkbox-field { flex-direction: row; align-items: center; gap: 0.6rem; }
+.settings-actions { display: flex; justify-content: flex-end; gap: 0.6rem; margin-top: 0.5rem; }
+.btn { appearance: none; border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.9rem; font: inherit; cursor: pointer; background: var(--bg); color: var(--text); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #1a1410; font-weight: 600; }
+.needs-setup .age-display { font-size: clamp(1.4rem, 4vw, 2rem); color: var(--text-muted); }
+.needs-setup .age-label { color: var(--accent); }

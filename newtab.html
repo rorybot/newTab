@@ -1,0 +1,37 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>New Tab</title>
+    <link rel="stylesheet" href="newtab.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="top-bar">
+        <time id="clock" class="clock" datetime=""></time>
+        <button type="button" id="settings-toggle" class="icon-btn" aria-label="Settings" title="Settings">⚙</button>
+      </header>
+      <section class="hero" aria-label="Mortality clock">
+        <p class="eyebrow">You are</p>
+        <p id="age-display" class="age-display">—</p>
+        <p id="age-label" class="age-label">years old</p>
+        <p id="death-countdown" class="death-countdown" hidden></p>
+      </section>
+    </main>
+    <dialog id="settings-dialog" class="settings-dialog">
+      <form id="settings-form" class="settings-form">
+        <h2>Settings</h2>
+        <label class="field"><span>Birth date</span><input type="date" id="birth-date" name="birthDate" required /></label>
+        <label class="field"><span>Birth time (optional)</span><input type="time" id="birth-time" name="birthTime" step="1" /></label>
+        <label class="field"><span>Expected lifespan (years)</span><input type="number" id="lifespan" name="lifespan" min="1" max="150" value="80" /></label>
+        <label class="field checkbox-field"><input type="checkbox" id="show-death" name="showDeath" /><span>Show death countdown</span></label>
+        <div class="settings-actions">
+          <button type="button" id="settings-cancel" class="btn ghost">Cancel</button>
+          <button type="submit" class="btn primary">Save</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="newtab.js" type="module"></script>
+  </body>
+</html>
