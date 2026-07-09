@@ -50,3 +50,14 @@ body {
 
 .settings-sub { margin: -0.5rem 0 0; font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono); }
 
+
+.life-ring-wrap { position: relative; width: min(280px, 70vw); aspect-ratio: 1; margin: 0 auto; }
+.life-ring { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+.ring-track { fill: none; stroke: #2a2520; stroke-width: 8; }
+.ring-progress { fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 0 100; filter: drop-shadow(0 0 6px rgba(196, 165, 116, 0.35)); }
+.ring-remaining { fill: none; stroke: rgba(196, 122, 106, 0.22); stroke-width: 8; stroke-dasharray: 0 100; }
+.ring-ticks line { stroke: rgba(154, 143, 130, 0.55); stroke-width: 1.25; }
+.ring-ticks line.decade { stroke: var(--accent); stroke-width: 1.75; opacity: 0.7; }
+.life-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 1.5rem; pointer-events: none; }
+.life-center .age-display { font-size: clamp(1.35rem, 3.8vw, 1.85rem); }
+.life-segments { margin: 1rem 0 0; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted); }

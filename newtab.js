@@ -1,10 +1,16 @@
 ﻿const STORAGE_KEY = "newTabSettings";
 const DEFAULTS = { birthDate: "", birthTime: "00:00:00", lifespan: 80, showDeath: false };
+const RING_R = 82, RING_CX = 100, RING_CY = 100;
 const els = {
   clock: document.getElementById("clock"),
   ageDisplay: document.getElementById("age-display"),
   ageLabel: document.getElementById("age-label"),
   deathCountdown: document.getElementById("death-countdown"),
+  lifeSegments: document.getElementById("life-segments"),
+  lifePane: document.getElementById("life-pane"),
+  ringProgress: document.getElementById("ring-progress"),
+  ringRemaining: document.getElementById("ring-remaining"),
+  ringTicks: document.getElementById("ring-ticks"),
   settingsToggle: document.getElementById("settings-toggle"),
   settingsDialog: document.getElementById("settings-dialog"),
   settingsForm: document.getElementById("settings-form"),
@@ -13,9 +19,9 @@ const els = {
   birthTime: document.getElementById("birth-time"),
   lifespan: document.getElementById("lifespan"),
   showDeath: document.getElementById("show-death"),
-  hero: document.querySelector(".hero"),
 };
 let settings = { ...DEFAULTS };
+let ticksDrawnFor = null;
 function pad(n, width = 2) { return String(n).padStart(width, "0"); }
 function formatClock(date) {
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -55,18 +61,13 @@ async function loadSettings() {
   if (hasExtensionStorage()) {
     try {
       const localResult = await chrome.storage.local.get(STORAGE_KEY);
-      if (localResult[STORAGE_KEY] && typeof localResult[STORAGE_KEY] === "object") {
-        loaded = localResult[STORAGE_KEY];
-      }
+      if (localResult[STORAGE_KEY] && typeof localResult[STORAGE_KEY] === "object") loaded = localResult[STORAGE_KEY];
     } catch { /* continue */ }
   }
   if (!loaded) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") loaded = parsed;
-      }
+      if (raw) { const parsed = JSON.parse(raw); if (parsed && typeof parsed === "object") loaded = parsed; }
     } catch { /* ignore */ }
   }
   settings = loaded ? { ...DEFAULTS, ...loaded } : { ...DEFAULTS };
@@ -79,6 +80,32 @@ async function saveSettings(next) {
     catch (err) { console.warn("chrome.storage.local.set failed", err); }
   }
 }
+function ensureRingTicks(lifespanYears) {
+  const n = Math.max(1, Math.min(150, Math.round(lifespanYears)));
+  if (ticksDrawnFor === n) return;
+  ticksDrawnFor = n;
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < n; i++) {
+    const angle = (i / n) * Math.PI * 2;
+    const isDecade = i % 10 === 0;
+    const inner = isDecade ? RING_R - 2 : RING_R + 1;
+    const outer = RING_R + 6;
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", String(RING_CX + Math.cos(angle) * outer));
+    line.setAttribute("y1", String(RING_CY + Math.sin(angle) * outer));
+    line.setAttribute("x2", String(RING_CX + Math.cos(angle) * inner));
+    line.setAttribute("y2", String(RING_CY + Math.sin(angle) * inner));
+    if (isDecade) line.classList.add("decade");
+    frag.appendChild(line);
+  }
+  els.ringTicks.replaceChildren(frag);
+}
+function updateRing(livedFraction) {
+  const lived = Math.max(0, Math.min(1, livedFraction)) * 100;
+  const remain = 100 - lived;
+  els.ringProgress.style.strokeDasharray = `${lived} ${100 - lived}`;
+  els.ringRemaining.style.strokeDasharray = `0 ${lived} ${remain} 0`;
+}
 function updateClock() {
   const now = new Date();
   els.clock.textContent = formatClock(now);
@@ -86,22 +113,33 @@ function updateClock() {
 }
 function updateAge() {
   const birth = parseBirthDateTime(settings.birthDate, settings.birthTime);
+  const lifespan = Number(settings.lifespan) || 80;
+  ensureRingTicks(lifespan);
   if (!birth) {
-    els.hero.classList.add("needs-setup");
-    els.ageDisplay.textContent = "Set your birth date";
-    els.ageLabel.textContent = "Open settings to get started";
+    els.lifePane.classList.add("needs-setup");
+    els.ageDisplay.textContent = "set birth date";
+    els.ageLabel.textContent = "⚙ settings to start";
     els.deathCountdown.hidden = true;
+    els.lifeSegments.textContent = "life ring idle · no birthday yet";
+    updateRing(0);
     return;
   }
-  els.hero.classList.remove("needs-setup");
+  els.lifePane.classList.remove("needs-setup");
   const now = new Date();
-  els.ageDisplay.textContent = formatAge(ageInYears(birth, now));
+  const years = ageInYears(birth, now);
+  const fraction = years / lifespan;
+  els.ageDisplay.textContent = formatAge(years);
   els.ageLabel.textContent = "years old";
+  updateRing(fraction);
+  const wholeYears = Math.floor(years);
+  const decade = Math.floor(years / 10) * 10;
+  els.lifeSegments.textContent =
+    `segment ${wholeYears + 1}/${lifespan} · decade ${decade}–${decade + 9} · ${Math.max(0, lifespan - years).toFixed(2)}y est. left`;
   if (settings.showDeath) {
-    const remaining = expectedDeathDate(birth, Number(settings.lifespan) || 80).getTime() - now.getTime();
+    const remaining = expectedDeathDate(birth, lifespan).getTime() - now.getTime();
     els.deathCountdown.textContent = remaining > 0
-      ? `~${formatDuration(remaining)} left (at ${settings.lifespan} years)`
-      : "You've outlived the estimate. Keep going.";
+      ? `~${formatDuration(remaining)} left @ ${lifespan}y`
+      : "outlived the estimate · keep going";
     els.deathCountdown.hidden = false;
   } else {
     els.deathCountdown.hidden = true;

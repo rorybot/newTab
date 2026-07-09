@@ -12,10 +12,23 @@
         <time id="clock" class="clock" datetime=""></time>
         <button type="button" id="settings-toggle" class="icon-btn" aria-label="Settings" title="Settings">⚙</button>
       </header>
-      <section class="hero" aria-label="Mortality clock">
-        <p class="eyebrow">You are</p>
-        <p id="age-display" class="age-display">—</p>
-        <p id="age-label" class="age-label">years old</p>
+      <section class="hero" id="life-pane" aria-label="Mortality clock">
+        <div class="life-ring-wrap">
+          <svg class="life-ring" viewBox="0 0 200 200" role="img" aria-labelledby="life-ring-label">
+            <title id="life-ring-label">Life progress ring</title>
+            <circle class="ring-track" cx="100" cy="100" r="82" />
+            <g id="ring-ticks" class="ring-ticks"></g>
+            <circle id="ring-progress" class="ring-progress" cx="100" cy="100" r="82" pathLength="100" />
+            <circle id="ring-remaining" class="ring-remaining" cx="100" cy="100" r="82" pathLength="100" />
+          </svg>
+          <div class="life-center">
+            <p class="eyebrow">You are</p>
+            <p id="age-display" class="age-display">—</p>
+            <p id="age-label" class="age-label">years old</p>
+          </div>
+        </div>
+        <p id="life-segments" class="life-segments"></p>
+        <p id="life-badge" class="life-badge" hidden></p>
         <p id="death-countdown" class="death-countdown" hidden></p>
       </section>
     </main>
@@ -36,4 +49,3 @@
     <script src="newtab.js" type="module"></script>
   </body>
 </html>
-
