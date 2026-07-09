@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -7,45 +7,229 @@
     <link rel="stylesheet" href="newtab.css" />
   </head>
   <body>
-    <main class="page">
-      <header class="top-bar">
-        <time id="clock" class="clock" datetime=""></time>
-        <button type="button" id="settings-toggle" class="icon-btn" aria-label="Settings" title="Settings">⚙</button>
-      </header>
-      <section class="hero" id="life-pane" aria-label="Mortality clock">
-        <div class="life-ring-wrap">
-          <svg class="life-ring" viewBox="0 0 200 200" role="img" aria-labelledby="life-ring-label">
-            <title id="life-ring-label">Life progress ring</title>
-            <circle class="ring-track" cx="100" cy="100" r="82" />
-            <g id="ring-ticks" class="ring-ticks"></g>
-            <circle id="ring-progress" class="ring-progress" cx="100" cy="100" r="82" pathLength="100" />
-            <circle id="ring-remaining" class="ring-remaining" cx="100" cy="100" r="82" pathLength="100" />
-          </svg>
-          <div class="life-center">
-            <p class="eyebrow">You are</p>
-            <p id="age-display" class="age-display">—</p>
-            <p id="age-label" class="age-label">years old</p>
-          </div>
+    <div id="bg-layer" class="bg-layer" aria-hidden="true"></div>
+    <div class="bg-scrim" aria-hidden="true"></div>
+
+    <div class="desktop">
+      <header class="status-bar">
+        <div class="status-left">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span class="status-session">new-tab</span>
+          <span class="status-sep">│</span>
+          <time id="clock" class="clock" datetime=""></time>
         </div>
-        <p id="life-segments" class="life-segments"></p>
-        <p id="life-badge" class="life-badge" hidden></p>
-        <p id="death-countdown" class="death-countdown" hidden></p>
-      </section>
-    </main>
+        <div class="status-right">
+          <span id="status-hint" class="status-hint">local · floating panes</span>
+          <button type="button" id="settings-toggle" class="icon-btn" aria-label="Settings" title="Settings">
+            ⚙
+          </button>
+        </div>
+      </header>
+
+      <main class="pane-grid" aria-label="Dashboard panes">
+        <!-- Life / mortality — central pane -->
+        <article class="pane pane-life" id="life-pane" aria-label="Life clock">
+          <header class="pane-titlebar">
+            <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="pane-name">life</span>
+            <span class="pane-badge" id="life-badge">—</span>
+          </header>
+          <div class="pane-body life-body">
+            <div class="life-ring-wrap">
+              <svg class="life-ring" viewBox="0 0 200 200" role="img" aria-labelledby="life-ring-label">
+                <title id="life-ring-label">Life progress ring</title>
+                <!-- background track -->
+                <circle class="ring-track" cx="100" cy="100" r="82" />
+                <!-- decade tick marks (drawn by JS into this group) -->
+                <g id="ring-ticks" class="ring-ticks"></g>
+                <!-- lived arc -->
+                <circle
+                  id="ring-progress"
+                  class="ring-progress"
+                  cx="100"
+                  cy="100"
+                  r="82"
+                  pathLength="100"
+                />
+                <!-- remaining arc hint (faint) -->
+                <circle
+                  id="ring-remaining"
+                  class="ring-remaining"
+                  cx="100"
+                  cy="100"
+                  r="82"
+                  pathLength="100"
+                />
+              </svg>
+              <div class="life-center">
+                <p class="life-eyebrow">you are</p>
+                <p id="age-display" class="age-display">—</p>
+                <p id="age-label" class="age-label">years old</p>
+              </div>
+            </div>
+            <div class="life-meta">
+              <p id="life-segments" class="life-segments mono"></p>
+              <p id="death-countdown" class="death-countdown mono" hidden></p>
+            </div>
+          </div>
+        </article>
+
+        <!-- Weather -->
+        <article class="pane pane-sm" id="weather-pane">
+          <header class="pane-titlebar">
+            <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="pane-name">weather</span>
+            <span class="pane-badge dim">stub</span>
+          </header>
+          <div class="pane-body">
+            <pre class="tui-stub" aria-hidden="true">┌ local ─────────┐
+│ ░░ waiting ░░  │
+│  · · · · · ·   │
+└────────────────┘</pre>
+            <p class="pane-placeholder">Local weather — coming soon</p>
+          </div>
+        </article>
+
+        <!-- Spotify -->
+        <article class="pane pane-sm" id="spotify-pane">
+          <header class="pane-titlebar">
+            <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="pane-name">spotify</span>
+            <span class="pane-badge dim">stub</span>
+          </header>
+          <div class="pane-body">
+            <pre class="tui-stub" aria-hidden="true">♪ ──────────────
+  no track yet
+  ▓▓▓▓▓░░░░░</pre>
+            <p class="pane-placeholder">Now playing — coming soon</p>
+          </div>
+        </article>
+
+        <!-- Hacker News -->
+        <article class="pane pane-md" id="hn-pane">
+          <header class="pane-titlebar">
+            <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="pane-name">hn</span>
+            <span class="pane-badge dim">stub</span>
+          </header>
+          <div class="pane-body">
+            <ol class="tui-list mono">
+              <li><span class="rank">1.</span> <span class="muted">front page mock…</span></li>
+              <li><span class="rank">2.</span> <span class="muted">story list TUI</span></li>
+              <li><span class="rank">3.</span> <span class="muted">coming soon</span></li>
+            </ol>
+          </div>
+        </article>
+
+        <!-- Private forum feed (URL from settings) -->
+        <article class="pane pane-md" id="forum-pane">
+          <header class="pane-titlebar">
+            <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="pane-name">forum</span>
+            <span class="pane-badge dim" id="forum-badge">stub</span>
+          </header>
+          <div class="pane-body">
+            <div class="tui-feed mono" id="forum-feed">
+              <p><span class="muted">#</span> feed · mock</p>
+              <p><span class="accent">›</span> <span class="muted" id="forum-status">set forum URL in settings</span></p>
+              <p class="muted">plain links · img on hover later</p>
+            </div>
+          </div>
+        </article>
+
+        <!-- Anthropic chat -->
+        <article class="pane pane-md" id="chat-pane">
+          <header class="pane-titlebar">
+            <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="pane-name">claude</span>
+            <span class="pane-badge dim">stub</span>
+          </header>
+          <div class="pane-body chat-body">
+            <div class="tui-feed mono">
+              <p><span class="muted">session</span> · anthropic api</p>
+              <p><span class="accent">you›</span> <span class="muted">…</span></p>
+              <p><span class="accent">ai›</span> <span class="muted">wire me up later</span></p>
+            </div>
+            <div class="chat-input-row" aria-hidden="true">
+              <span class="prompt-char">›</span>
+              <span class="muted">prompt stub</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Flight radar -->
+        <article class="pane pane-sm" id="radar-pane">
+          <header class="pane-titlebar">
+            <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="pane-name">radar</span>
+            <span class="pane-badge dim">stub</span>
+          </header>
+          <div class="pane-body">
+            <div class="radar-deco" aria-hidden="true">
+              <span class="radar-sweep"></span>
+            </div>
+            <p class="pane-placeholder">Local ADS-B — coming soon</p>
+          </div>
+        </article>
+      </main>
+    </div>
+
     <dialog id="settings-dialog" class="settings-dialog">
       <form id="settings-form" class="settings-form">
         <h2>Settings</h2>
-        <p class="settings-sub">persisted in chrome.storage.local</p>
-        <label class="field"><span>Birth date</span><input type="date" id="birth-date" name="birthDate" required /></label>
-        <label class="field"><span>Birth time (optional)</span><input type="time" id="birth-time" name="birthTime" step="1" /></label>
-        <label class="field"><span>Expected lifespan (years)</span><input type="number" id="lifespan" name="lifespan" min="1" max="150" value="80" /></label>
-        <label class="field checkbox-field"><input type="checkbox" id="show-death" name="showDeath" /><span>Show death countdown</span></label>
+        <p class="settings-sub mono">persisted in chrome.storage.local</p>
+
+        <label class="field">
+          <span>Birth date</span>
+          <input type="date" id="birth-date" name="birthDate" required />
+        </label>
+
+        <label class="field">
+          <span>Birth time (optional)</span>
+          <input type="time" id="birth-time" name="birthTime" step="1" />
+        </label>
+
+        <label class="field">
+          <span>Expected lifespan (years)</span>
+          <input type="number" id="lifespan" name="lifespan" min="1" max="150" value="80" />
+        </label>
+
+        <label class="field checkbox-field">
+          <input type="checkbox" id="show-death" name="showDeath" />
+          <span>Show death countdown</span>
+        </label>
+
+        <label class="field">
+          <span>Forum feed URL</span>
+          <input
+            type="url"
+            id="forum-url"
+            name="forumUrl"
+            placeholder="https://… (your board / new-content URL)"
+            autocomplete="off"
+          />
+        </label>
+        <p class="field-hint">Private — stored only on this browser. Never committed. Powers the forum TUI pane later.</p>
+
+        <label class="field">
+          <span>Background image URL (optional)</span>
+          <input
+            type="url"
+            id="bg-image"
+            name="bgImage"
+            placeholder="https://… or leave empty"
+            autocomplete="off"
+          />
+        </label>
+        <p class="field-hint">Not pure ASCII — real photos/art welcome. Scrim keeps panes readable.</p>
+
         <div class="settings-actions">
           <button type="button" id="settings-cancel" class="btn ghost">Cancel</button>
           <button type="submit" class="btn primary">Save</button>
         </div>
       </form>
     </dialog>
+
     <script src="newtab.js" type="module"></script>
   </body>
 </html>

@@ -1,6 +1,6 @@
-﻿# New Tab
+# New Tab
 
-Personal Brave/Chrome extension that replaces the new tab page with a mortality-style age clock.
+Personal Brave/Chrome extension that replaces the new tab page with a floating, tmux-ish pane dashboard: life ring + age clock, plus stub panes for weather, Spotify, HN, forum feed, Claude chat, and local flight radar.
 
 ## Load unpacked (Brave)
 
@@ -17,6 +17,7 @@ First launch opens settings so you can set your birth date.
 |------|---------|
 | `manifest.json` | MV3 manifest, `chrome_url_overrides.newtab` |
 | `newtab.html` / `.css` / `.js` | New tab UI and mortality clock |
+| `GrokInstructions.md` | Product notes / backlog for future work |
 | `icons/` | Extension icons |
 
 ## License
