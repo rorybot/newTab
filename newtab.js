@@ -47,6 +47,38 @@ function formatDuration(ms) {
 function expectedDeathDate(birth, lifespanYears) {
   return new Date(birth.getTime() + lifespanYears * 365.2425 * 24 * 60 * 60 * 1000);
 }
+function hasExtensionStorage() {
+  return typeof chrome !== "undefined" && chrome?.storage?.local != null;
+}
+async function loadSettings() {
+  let loaded = null;
+  if (hasExtensionStorage()) {
+    try {
+      const localResult = await chrome.storage.local.get(STORAGE_KEY);
+      if (localResult[STORAGE_KEY] && typeof localResult[STORAGE_KEY] === "object") {
+        loaded = localResult[STORAGE_KEY];
+      }
+    } catch { /* continue */ }
+  }
+  if (!loaded) {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") loaded = parsed;
+      }
+    } catch { /* ignore */ }
+  }
+  settings = loaded ? { ...DEFAULTS, ...loaded } : { ...DEFAULTS };
+}
+async function saveSettings(next) {
+  settings = { ...DEFAULTS, ...next };
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* private mode */ }
+  if (hasExtensionStorage()) {
+    try { await chrome.storage.local.set({ [STORAGE_KEY]: settings }); }
+    catch (err) { console.warn("chrome.storage.local.set failed", err); }
+  }
+}
 function updateClock() {
   const now = new Date();
   els.clock.textContent = formatClock(now);
@@ -76,22 +108,6 @@ function updateAge() {
   }
 }
 function tick() { updateClock(); updateAge(); }
-async function loadSettings() {
-  try {
-    const result = await chrome.storage.sync.get(STORAGE_KEY);
-    if (result[STORAGE_KEY] && typeof result[STORAGE_KEY] === "object") {
-      settings = { ...DEFAULTS, ...result[STORAGE_KEY] };
-    }
-  } catch {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) { try { settings = { ...DEFAULTS, ...JSON.parse(raw) }; } catch { /* ignore */ } }
-  }
-}
-async function saveSettings(next) {
-  settings = { ...DEFAULTS, ...next };
-  try { await chrome.storage.sync.set({ [STORAGE_KEY]: settings }); }
-  catch { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); }
-}
 function fillForm() {
   els.birthDate.value = settings.birthDate || "";
   els.birthTime.value = (settings.birthTime || "00:00:00").slice(0, 8);
