@@ -139,6 +139,25 @@ let weatherCache: WeatherCacheEntry | null = null;
 let weatherFetchInFlight = false;
 let lastWeatherZip = "";
 let clockTimer: ReturnType<typeof setInterval> | null = null;
+let weatherRefreshTimer: ReturnType<typeof setInterval> | null = null;
+
+/** Reuse formatters — creating Intl.DateTimeFormat every second is wasteful. */
+const tzFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function formatterForTz(timeZone: string): Intl.DateTimeFormat {
+  let fmt = tzFormatterCache.get(timeZone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+      hourCycle: "h23",
+    });
+    tzFormatterCache.set(timeZone, fmt);
+  }
+  return fmt;
+}
 
 export function normalizeZip(raw: string | null | undefined): string {
   return String(raw || "").trim();
@@ -159,13 +178,7 @@ function shortPlaceLabel(full: string): string {
 /** Local hours/minutes in a timezone for analog clock hands. */
 function localHm(timeZone: string, now = new Date()): { h: number; m: number; s: number } {
   try {
-    const parts = new Intl.DateTimeFormat("en-GB", {
-      timeZone,
-      hour: "numeric",
-      minute: "numeric",
-      second: "numeric",
-      hourCycle: "h23",
-    }).formatToParts(now);
+    const parts = formatterForTz(timeZone).formatToParts(now);
     const num = (type: string) =>
       Number(parts.find((p) => p.type === type)?.value ?? "0");
     return { h: num("hour"), m: num("minute"), s: num("second") };
@@ -177,9 +190,10 @@ function localHm(timeZone: string, now = new Date()): { h: number; m: number; s:
 function setClockHands(svg: SVGSVGElement, timeZone: string): void {
   if (!timeZone) return;
   svg.dataset.timezone = timeZone;
-  const { h, m, s } = localHm(timeZone);
+  const { h, m } = localHm(timeZone);
+  // Minute hand only needs minute precision; second-hand sweep was pure cost.
   const hourDeg = ((h % 12) + m / 60) * 30;
-  const minDeg = (m + s / 60) * 6;
+  const minDeg = m * 6;
   // SVG transform (not CSS) so origin stays at face center when the icon scales
   const hourHand = svg.querySelector<SVGLineElement>(".wx-clock-hour");
   const minHand = svg.querySelector<SVGLineElement>(".wx-clock-min");
@@ -198,6 +212,13 @@ function tickClocks(): void {
     const tz = svg.dataset.timezone || "";
     if (tz) setClockHands(svg, tz);
   });
+}
+
+function stopClockTicker(): void {
+  if (clockTimer != null) {
+    clearInterval(clockTimer);
+    clockTimer = null;
+  }
 }
 
 function startClockTicker(): void {
@@ -840,7 +861,25 @@ export async function refreshWeather(opts: { force?: boolean } = {}): Promise<vo
 export function initWeatherPane(): void {
   void refreshWeather();
   startClockTicker();
-  setInterval(() => {
+  weatherRefreshTimer = setInterval(() => {
     void refreshWeather();
   }, WEATHER_REFRESH_MS);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopClockTicker();
+      if (weatherRefreshTimer != null) {
+        clearInterval(weatherRefreshTimer);
+        weatherRefreshTimer = null;
+      }
+    } else {
+      startClockTicker();
+      if (weatherRefreshTimer == null) {
+        weatherRefreshTimer = setInterval(() => {
+          void refreshWeather();
+        }, WEATHER_REFRESH_MS);
+      }
+      void refreshWeather();
+    }
+  });
 }

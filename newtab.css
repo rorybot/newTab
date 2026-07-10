@@ -17,7 +17,8 @@
   --font-mono: "Cascadia Code", "Consolas", "SF Mono", ui-monospace, monospace;
   --radius: 10px;
   --shadow: 0 16px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 0, 0, 0.2);
-  --pane-blur: blur(14px);
+  /* Lighter blur: full-page backdrop-filter on every pane is a steady GPU tax */
+  --pane-blur: blur(8px);
 }
 
 *,
@@ -192,7 +193,9 @@ body.has-bg-image .bg-scrim {
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  /* Isolate paint so pane chrome doesn't invalidate the whole desktop */
+  contain: layout style;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .pane:hover {
@@ -433,8 +436,8 @@ body.has-bg-image .bg-scrim {
   stroke-width: 8;
   stroke-linecap: round;
   stroke-dasharray: 0 100;
-  transition: stroke-dasharray 0.35s ease;
-  filter: drop-shadow(0 0 6px rgba(196, 165, 116, 0.35));
+  /* No stroke-dasharray transition: life pane used to update so often that
+     the transition never settled → continuous repaint. */
 }
 
 .ring-remaining {
@@ -443,7 +446,6 @@ body.has-bg-image .bg-scrim {
   stroke-width: 8;
   stroke-linecap: butt;
   stroke-dasharray: 0 100;
-  transition: stroke-dasharray 0.35s ease;
 }
 
 .ring-ticks line {
@@ -1276,11 +1278,25 @@ body.has-bg-image .bg-scrim {
   inset: 0;
   background: conic-gradient(from 0deg, transparent 0deg, rgba(196, 165, 116, 0.25) 40deg, transparent 50deg);
   animation: sweep 4s linear infinite;
+  will-change: transform;
 }
 
 @keyframes sweep {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Pause decorative motion when the tab is backgrounded (class set by JS). */
+body.nt-hidden .radar-sweep,
+body.nt-hidden .wx-spf-warn.hot {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radar-sweep,
+  .wx-spf-warn.hot {
+    animation: none;
   }
 }
 

@@ -1,6 +1,6 @@
 # New Tab
 
-Personal Brave/Chrome extension that replaces the new tab page with a floating, tmux-ish pane dashboard: life ring + age clock, weather TUI, a **one-shot room snapshot** (recent shouts from JSON), plus stub panes for Spotify, HN, Claude chat, and local flight radar.
+Personal Brave/Chrome extension that replaces the new tab page with a floating, tmux-ish pane dashboard: life ring + age clock, weather TUI, a **one-shot room snapshot** (recent shouts from JSON), stub panes for Spotify, HN, Claude chat, local flight radar, and planned panes for **Etymology** (Root of the Day) and **Anglish** (Germanic alternatives for loanwords) — both in mock-TUI style.
 
 **TypeScript** source under `src/` (modular features); build entry is `src/main.ts` → `newtab.js`.
 
@@ -74,6 +74,8 @@ First launch opens settings so you can set birth date, zip, etc.
 | `src/features/life/` | Life ring + age clock |
 | `src/features/weather/` | Weather TUI |
 | `src/features/room/` | Room snapshot (flagged off; login scrape TBD) |
+| *(planned)* `src/features/etymology/` | Root of the Day – etymology.com word + TUI visual |
+| *(planned)* `src/features/anglish/` | Anglish – Germanic alternatives for loanwords |
 | `src/settings/` | Settings types + chrome.storage store |
 | `src/ui/` | DOM refs, settings dialog, background |
 | `src/lib/` | Shared helpers (dom, format, age) |

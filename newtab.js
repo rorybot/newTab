@@ -276,10 +276,31 @@ function getRoomEls() {
 var RING_R = 82;
 var RING_CX = 100;
 var RING_CY = 100;
+var AGE_MS = 250;
+var SLOW_MS = 1e3;
 var ticksDrawnFor = null;
+var ageTimer = null;
+var slowTimer = null;
+var lastClockText = "";
+var lastAgeText = "";
+var lastAgeLabel = "";
+var lastBadge = "";
+var lastSegments = "";
+var lastDeathText = "";
+var lastDeathHidden = null;
+var lastRingKey = "";
+var lastNeedsSetup = null;
+function setTextIfChanged(el, next, prev) {
+  if (next === prev) return prev;
+  el.textContent = next;
+  return next;
+}
 function updateClock() {
   const now = /* @__PURE__ */ new Date();
-  els.clock.textContent = formatClock(now);
+  const text = formatClock(now);
+  if (text === lastClockText) return;
+  lastClockText = text;
+  els.clock.textContent = text;
   els.clock.dateTime = now.toISOString();
 }
 function ensureRingTicks(lifespanYears) {
@@ -309,58 +330,119 @@ function ensureRingTicks(lifespanYears) {
   els.ringTicks.replaceChildren(frag);
 }
 function updateRing(livedFraction) {
-  const lived = Math.max(0, Math.min(1, livedFraction)) * 100;
+  const lived = Math.round(Math.max(0, Math.min(1, livedFraction)) * 1e3) / 10;
+  const key = String(lived);
+  if (key === lastRingKey) return;
+  lastRingKey = key;
   const remain = 100 - lived;
   els.ringProgress.style.strokeDasharray = `${lived} ${100 - lived}`;
   els.ringRemaining.style.strokeDasharray = `0 ${lived} ${remain} 0`;
 }
-function updateAge() {
+function updateAgeDigitsOnly() {
+  const settings2 = getSettings();
+  const birth = parseBirthDateTime(settings2.birthDate, settings2.birthTime);
+  if (!birth) return;
+  const years = ageInYears(birth);
+  lastAgeText = setTextIfChanged(els.ageDisplay, formatAge(years), lastAgeText);
+}
+function updateAge(opts = {}) {
+  const full = opts.full !== false;
   const settings2 = getSettings();
   const birth = parseBirthDateTime(settings2.birthDate, settings2.birthTime);
   const lifespan = Number(settings2.lifespan) || 80;
-  ensureRingTicks(lifespan);
+  if (full) {
+    ensureRingTicks(lifespan);
+  }
   if (!birth) {
-    els.lifePane.classList.add("needs-setup");
-    els.ageDisplay.textContent = "set birth date";
-    els.ageLabel.textContent = "\u2699 settings to start";
-    els.deathCountdown.hidden = true;
-    els.lifeSegments.textContent = "life ring idle \xB7 no birthday yet";
-    els.lifeBadge.textContent = "setup";
-    updateRing(0);
+    if (lastNeedsSetup !== true) {
+      els.lifePane.classList.add("needs-setup");
+      lastNeedsSetup = true;
+    }
+    lastAgeText = setTextIfChanged(els.ageDisplay, "set birth date", lastAgeText);
+    lastAgeLabel = setTextIfChanged(els.ageLabel, "\u2699 settings to start", lastAgeLabel);
+    if (lastDeathHidden !== true) {
+      els.deathCountdown.hidden = true;
+      lastDeathHidden = true;
+    }
+    lastSegments = setTextIfChanged(
+      els.lifeSegments,
+      "life ring idle \xB7 no birthday yet",
+      lastSegments
+    );
+    lastBadge = setTextIfChanged(els.lifeBadge, "setup", lastBadge);
+    if (full) updateRing(0);
     return;
   }
-  els.lifePane.classList.remove("needs-setup");
+  if (lastNeedsSetup !== false) {
+    els.lifePane.classList.remove("needs-setup");
+    lastNeedsSetup = false;
+  }
   const now = /* @__PURE__ */ new Date();
   const years = ageInYears(birth, now);
   const fraction = years / lifespan;
-  els.ageDisplay.textContent = formatAge(years);
-  els.ageLabel.textContent = "years old";
-  els.lifeBadge.textContent = `${Math.min(100, fraction * 100).toFixed(1)}%`;
+  lastAgeText = setTextIfChanged(els.ageDisplay, formatAge(years), lastAgeText);
+  lastAgeLabel = setTextIfChanged(els.ageLabel, "years old", lastAgeLabel);
+  if (!full) return;
+  lastBadge = setTextIfChanged(
+    els.lifeBadge,
+    `${Math.min(100, fraction * 100).toFixed(1)}%`,
+    lastBadge
+  );
   updateRing(fraction);
   const wholeYears = Math.floor(years);
   const decade = Math.floor(years / 10) * 10;
   const yearInDecade = wholeYears - decade;
-  els.lifeSegments.textContent = `segment ${wholeYears + 1}/${lifespan} \xB7 decade ${decade}\u2013${decade + 9} \xB7 +${yearInDecade}y in block \xB7 ${Math.max(0, lifespan - years).toFixed(2)}y est. left`;
+  lastSegments = setTextIfChanged(
+    els.lifeSegments,
+    `segment ${wholeYears + 1}/${lifespan} \xB7 decade ${decade}\u2013${decade + 9} \xB7 +${yearInDecade}y in block \xB7 ${Math.max(0, lifespan - years).toFixed(2)}y est. left`,
+    lastSegments
+  );
   if (settings2.showDeath) {
     const death = expectedDeathDate(birth, lifespan);
     const remaining = death.getTime() - now.getTime();
-    if (remaining > 0) {
-      els.deathCountdown.textContent = `~${formatDuration(remaining)} left @ ${lifespan}y`;
-    } else {
-      els.deathCountdown.textContent = "outlived the estimate \xB7 keep going";
+    const deathText = remaining > 0 ? `~${formatDuration(remaining)} left @ ${lifespan}y` : "outlived the estimate \xB7 keep going";
+    lastDeathText = setTextIfChanged(els.deathCountdown, deathText, lastDeathText);
+    if (lastDeathHidden !== false) {
+      els.deathCountdown.hidden = false;
+      lastDeathHidden = false;
     }
-    els.deathCountdown.hidden = false;
-  } else {
+  } else if (lastDeathHidden !== true) {
     els.deathCountdown.hidden = true;
+    lastDeathHidden = true;
   }
 }
 function tickLife() {
   updateClock();
-  updateAge();
+  updateAge({ full: true });
+}
+function stopLifeTimers() {
+  if (ageTimer != null) {
+    clearInterval(ageTimer);
+    ageTimer = null;
+  }
+  if (slowTimer != null) {
+    clearInterval(slowTimer);
+    slowTimer = null;
+  }
+}
+function startLifeTimers() {
+  stopLifeTimers();
+  tickLife();
+  ageTimer = setInterval(updateAgeDigitsOnly, AGE_MS);
+  slowTimer = setInterval(() => {
+    updateClock();
+    updateAge({ full: true });
+  }, SLOW_MS);
 }
 function initLifePane() {
-  tickLife();
-  setInterval(tickLife, 50);
+  startLifeTimers();
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopLifeTimers();
+    } else {
+      startLifeTimers();
+    }
+  });
 }
 
 // src/features/room/room-pane.ts
@@ -769,12 +851,15 @@ async function connectSpotify() {
     show_dialog: "true"
   });
   const authUrl = `${AUTHORIZE_URL}?${params.toString()}`;
+  console.log("[spotify] starting OAuth, redirectUri=", redirectUri);
+  console.log("[spotify] authUrl=", authUrl);
   let responseUrl;
   try {
     responseUrl = await new Promise((resolve, reject) => {
       chrome.identity.launchWebAuthFlow(
         { url: authUrl, interactive: true },
         (url) => {
+          console.log("[spotify] launchWebAuthFlow callback url=", url, "lastError=", chrome.runtime.lastError);
           if (chrome.runtime.lastError) {
             reject(new Error(chrome.runtime.lastError.message));
             return;
@@ -783,6 +868,7 @@ async function connectSpotify() {
         }
       );
     });
+    console.log("[spotify] got responseUrl=", responseUrl);
   } catch (err2) {
     const msg = err2 instanceof Error ? err2.message : String(err2);
     if (/canceled|cancelled|user/i.test(msg)) {
@@ -793,6 +879,7 @@ async function connectSpotify() {
   if (!responseUrl) {
     throw new Error("Auth returned no redirect URL (cancelled?).");
   }
+  console.log("[spotify] responseUrl received, parsing code/state");
   const returned = new URL(responseUrl);
   const q = returned.searchParams.get("code") != null ? returned.searchParams : new URLSearchParams(returned.hash.replace(/^#/, ""));
   const err = q.get("error");
@@ -807,12 +894,14 @@ async function connectSpotify() {
   if (returnedState !== state) {
     throw new Error("OAuth state mismatch \u2014 try connecting again.");
   }
+  console.log("[spotify] code and state valid, exchanging for tokens");
   const tokenBody = new URLSearchParams({
     grant_type: "authorization_code",
     code,
     redirect_uri: redirectUri
   });
   const data = await exchangeToken(tokenBody, clientId, clientSecret);
+  console.log("[spotify] token exchange response keys:", Object.keys(data));
   if (!data.refresh_token) {
     throw new Error("No refresh token returned \u2014 check app settings / scopes.");
   }
@@ -1006,7 +1095,20 @@ function updateProgressUi(cp) {
 function renderIdle() {
   lastPlaying = null;
   setBadge("idle", true);
-  showView("idle");
+  els.spTrack.textContent = "nothing playing";
+  els.spTrack.removeAttribute("href");
+  els.spTrack.classList.remove("has-link");
+  els.spArtist.textContent = "open Spotify on any device";
+  els.spAlbum.textContent = "";
+  els.spAlbum.hidden = true;
+  els.spArt.removeAttribute("src");
+  els.spArt.hidden = true;
+  els.spProgressText.textContent = "0:00 / 0:00";
+  els.spBarFill.style.width = "0%";
+  els.spotifyLive.hidden = false;
+  els.spotifySetup.hidden = true;
+  els.spotifyAuth.hidden = true;
+  els.spotifyIdle.hidden = true;
   els.spotifyDisconnect.hidden = false;
   els.spotifyRefresh.hidden = false;
 }
@@ -1191,6 +1293,22 @@ var weatherCache = null;
 var weatherFetchInFlight = false;
 var lastWeatherZip = "";
 var clockTimer = null;
+var weatherRefreshTimer = null;
+var tzFormatterCache = /* @__PURE__ */ new Map();
+function formatterForTz(timeZone) {
+  let fmt = tzFormatterCache.get(timeZone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+      hourCycle: "h23"
+    });
+    tzFormatterCache.set(timeZone, fmt);
+  }
+  return fmt;
+}
 function normalizeZip(raw) {
   return String(raw || "").trim();
 }
@@ -1205,13 +1323,7 @@ function shortPlaceLabel(full) {
 }
 function localHm(timeZone, now = /* @__PURE__ */ new Date()) {
   try {
-    const parts = new Intl.DateTimeFormat("en-GB", {
-      timeZone,
-      hour: "numeric",
-      minute: "numeric",
-      second: "numeric",
-      hourCycle: "h23"
-    }).formatToParts(now);
+    const parts = formatterForTz(timeZone).formatToParts(now);
     const num = (type) => Number(parts.find((p) => p.type === type)?.value ?? "0");
     return { h: num("hour"), m: num("minute"), s: num("second") };
   } catch {
@@ -1221,9 +1333,9 @@ function localHm(timeZone, now = /* @__PURE__ */ new Date()) {
 function setClockHands(svg, timeZone) {
   if (!timeZone) return;
   svg.dataset.timezone = timeZone;
-  const { h, m, s } = localHm(timeZone);
+  const { h, m } = localHm(timeZone);
   const hourDeg = (h % 12 + m / 60) * 30;
-  const minDeg = (m + s / 60) * 6;
+  const minDeg = m * 6;
   const hourHand = svg.querySelector(".wx-clock-hour");
   const minHand = svg.querySelector(".wx-clock-min");
   if (hourHand) hourHand.setAttribute("transform", `rotate(${hourDeg} 16 16)`);
@@ -1239,6 +1351,12 @@ function tickClocks() {
     const tz = svg.dataset.timezone || "";
     if (tz) setClockHands(svg, tz);
   });
+}
+function stopClockTicker() {
+  if (clockTimer != null) {
+    clearInterval(clockTimer);
+    clockTimer = null;
+  }
 }
 function startClockTicker() {
   tickClocks();
@@ -1772,9 +1890,26 @@ async function refreshWeather(opts = {}) {
 function initWeatherPane() {
   void refreshWeather();
   startClockTicker();
-  setInterval(() => {
+  weatherRefreshTimer = setInterval(() => {
     void refreshWeather();
   }, WEATHER_REFRESH_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopClockTicker();
+      if (weatherRefreshTimer != null) {
+        clearInterval(weatherRefreshTimer);
+        weatherRefreshTimer = null;
+      }
+    } else {
+      startClockTicker();
+      if (weatherRefreshTimer == null) {
+        weatherRefreshTimer = setInterval(() => {
+          void refreshWeather();
+        }, WEATHER_REFRESH_MS);
+      }
+      void refreshWeather();
+    }
+  });
 }
 
 // src/ui/background.ts
@@ -1878,8 +2013,13 @@ function initSettingsDialog() {
 }
 
 // src/main.ts
+function syncVisibilityClass() {
+  document.body.classList.toggle("nt-hidden", document.hidden);
+}
 async function bootstrap() {
   applyFeatureVisibility(FEATURES);
+  syncVisibilityClass();
+  document.addEventListener("visibilitychange", syncVisibilityClass);
   await loadSettings();
   applyBackground();
   initSettingsDialog();

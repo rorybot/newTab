@@ -77,6 +77,19 @@ Same settings dialog for first-run and later edits:
 - Host permissions: `accounts.spotify.com`, `api.spotify.com`; permission: `identity`
 - Dev-mode Spotify apps must add your account under **Users** in the dashboard
 
+### Etymology — Root of the Day (planned)
+
+- Pull a random word (or interesting root) from **etymology.com** (public scrape or lightweight API if one appears).
+- Display etymology / word origin in a compact **mock-TUI** visual — same family as the weather / HN panes (monospace, titlebar, chips, subtle art).
+- Goal: “Root of the Day” rather than classic Word of the Day; focus on interesting etymological stories or shared roots.
+- Keep everything lightweight and offline-cacheable; no heavy frontend work.
+
+### Anglish — Germanic alternative (planned)
+
+- For a given word (random or user-selected), surface the **Anglish** (pure Germanic / Anglo-Saxon) equivalent as a fun “what if English had stayed purer” alternative.
+- Same mock-TUI visual treatment: compact pane, titlebar, interesting layout that highlights the native root vs. the loanword.
+- Can sit alongside the Etymology pane or share data source; goal is playful language exploration in the same aesthetic.
+
 ### Mock TUI snippets (shared vibe)
 
 Several panels share the same idea: **cute, compact mock TUI** slices on the new tab (monospaced / near-terminal chrome, dark sandy theme) — not full apps. Same family as the personal Hacker News reader TUI.

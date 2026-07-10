@@ -114,7 +114,21 @@ function updateProgressUi(cp: CurrentlyPlaying): void {
 function renderIdle(): void {
   lastPlaying = null;
   setBadge("idle", true);
-  showView("idle");
+  // Use the live player layout with empty state instead of the minimal idle view
+  els.spTrack.textContent = "nothing playing";
+  els.spTrack.removeAttribute("href");
+  els.spTrack.classList.remove("has-link");
+  els.spArtist.textContent = "open Spotify on any device";
+  els.spAlbum.textContent = "";
+  els.spAlbum.hidden = true;
+  els.spArt.removeAttribute("src");
+  els.spArt.hidden = true;
+  els.spProgressText.textContent = "0:00 / 0:00";
+  els.spBarFill.style.width = "0%";
+  els.spotifyLive.hidden = false;
+  els.spotifySetup.hidden = true;
+  els.spotifyAuth.hidden = true;
+  els.spotifyIdle.hidden = true;
   els.spotifyDisconnect.hidden = false;
   els.spotifyRefresh.hidden = false;
 }

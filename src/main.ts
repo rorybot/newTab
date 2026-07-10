@@ -15,8 +15,14 @@ import { applyBackground } from "./ui/background.js";
 import { getRoomEls } from "./ui/refs.js";
 import { initSettingsDialog, openSettings } from "./ui/settings-dialog.js";
 
+function syncVisibilityClass(): void {
+  document.body.classList.toggle("nt-hidden", document.hidden);
+}
+
 async function bootstrap(): Promise<void> {
   applyFeatureVisibility(FEATURES);
+  syncVisibilityClass();
+  document.addEventListener("visibilitychange", syncVisibilityClass);
 
   await loadSettings();
   applyBackground();
