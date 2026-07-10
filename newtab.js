@@ -4,6 +4,8 @@ var FEATURES = {
   life: true,
   /** Weather TUI via Open-Meteo. */
   weather: true,
+  /** Spotify now-playing (needs client id/secret + user OAuth). */
+  spotify: true,
   /**
    * Room snapshot JSON (recent shouts).
    * Disabled: needs login-aware scrape on the backend first.
@@ -75,9 +77,12 @@ var DEFAULTS = {
   showDeath: false,
   zipCode: "",
   roomJsonUrl: "",
-  bgImage: ""
+  bgImage: "",
+  spotifyClientId: "",
+  spotifyClientSecret: ""
 };
 var STORAGE_KEY = "newTabSettings";
+var SPOTIFY_AUTH_KEY = "spotifyAuth";
 
 // src/settings/store.ts
 var settings = { ...DEFAULTS };
@@ -133,7 +138,7 @@ async function loadSettings() {
   return settings;
 }
 async function saveSettings(next) {
-  settings = { ...DEFAULTS, ...next };
+  settings = { ...DEFAULTS, ...settings, ...next };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch {
@@ -191,8 +196,18 @@ var els = {
   weatherBadge: requireEl("weather-badge"),
   weatherSetup: requireEl("weather-setup"),
   weatherLive: requireEl("weather-live"),
-  wxTemp: requireEl("wx-temp"),
-  wxPlace: requireEl("wx-place"),
+  wxSkyHome: requireEl("wx-sky-home"),
+  wxTempHome: requireEl("wx-temp-home"),
+  wxPlaceHome: requireEl("wx-place-home"),
+  wxClockHome: requireEl("wx-clock-home"),
+  wxSkyLondon: requireEl("wx-sky-london"),
+  wxTempLondon: requireEl("wx-temp-london"),
+  wxPlaceLondon: requireEl("wx-place-london"),
+  wxClockLondon: requireEl("wx-clock-london"),
+  wxSkyKnoxville: requireEl("wx-sky-knoxville"),
+  wxTempKnoxville: requireEl("wx-temp-knoxville"),
+  wxPlaceKnoxville: requireEl("wx-place-knoxville"),
+  wxClockKnoxville: requireEl("wx-clock-knoxville"),
   wxHumidity: requireEl("wx-humidity"),
   wxWind: requireEl("wx-wind"),
   wxSunrise: requireEl("wx-sunrise"),
@@ -204,11 +219,34 @@ var els = {
   wxBars: requireEl("wx-bars"),
   wxWindBars: requireEl("wx-wind-bars"),
   wxUvBars: requireEl("wx-uv-bars"),
-  wxSky: requireEl("wx-sky"),
+  wxDay5Temps: requireEl("wx-day5-temps"),
+  wxDay5Winds: requireEl("wx-day5-winds"),
+  wxSpfUv: requireEl("wx-spf-uv"),
+  wxSpfNeedle: requireEl("wx-spf-needle"),
+  wxSpfWarn: requireEl("wx-spf-warn"),
   wxWindIco: requireEl("wx-wind-ico"),
   wxHumBar: requireEl("wx-hum-bar"),
   wxUv: requireEl("wx-uv"),
-  wxError: requireEl("wx-error")
+  wxError: requireEl("wx-error"),
+  // Spotify
+  spotifyBadge: requireEl("spotify-badge"),
+  spotifyRefresh: requireEl("spotify-refresh"),
+  spotifySetup: requireEl("spotify-setup"),
+  spotifyAuth: requireEl("spotify-auth"),
+  spotifyConnect: requireEl("spotify-connect"),
+  spotifyIdle: requireEl("spotify-idle"),
+  spotifyLive: requireEl("spotify-live"),
+  spotifyError: requireEl("spotify-error"),
+  spotifyDisconnect: requireEl("spotify-disconnect"),
+  spArt: requireEl("sp-art"),
+  spTrack: requireEl("sp-track"),
+  spArtist: requireEl("sp-artist"),
+  spAlbum: requireEl("sp-album"),
+  spProgressText: requireEl("sp-progress-text"),
+  spBarFill: requireEl("sp-bar-fill"),
+  spotifyClientId: requireEl("spotify-client-id"),
+  spotifyClientSecret: requireEl("spotify-client-secret"),
+  spotifyRedirectUri: requireEl("spotify-redirect-uri")
 };
 function getRoomEls() {
   const ids = [
@@ -596,17 +634,626 @@ function initRoomPane(els2) {
   void refreshRoom();
 }
 
+// src/features/spotify/auth.ts
+var TOKEN_URL = "https://accounts.spotify.com/api/token";
+var AUTHORIZE_URL = "https://accounts.spotify.com/authorize";
+var SPOTIFY_SCOPES = [
+  "user-read-currently-playing",
+  "user-read-playback-state"
+].join(" ");
+var EXPIRY_SKEW_MS = 6e4;
+function hasExtensionStorage2() {
+  return typeof chrome !== "undefined" && chrome?.storage?.local != null;
+}
+function hasIdentityApi() {
+  return typeof chrome !== "undefined" && chrome?.identity != null;
+}
+function getSpotifyRedirectUri() {
+  if (!hasIdentityApi() || typeof chrome.identity.getRedirectURL !== "function") {
+    return null;
+  }
+  try {
+    return chrome.identity.getRedirectURL();
+  } catch {
+    return null;
+  }
+}
+function hasSpotifyCredentials() {
+  const s = getSettings();
+  return Boolean(s.spotifyClientId?.trim() && s.spotifyClientSecret?.trim());
+}
+async function loadSpotifyAuth() {
+  if (hasExtensionStorage2()) {
+    try {
+      const result = await chrome.storage.local.get(SPOTIFY_AUTH_KEY);
+      const raw = result[SPOTIFY_AUTH_KEY];
+      if (isSpotifyAuth(raw)) return raw;
+    } catch {
+    }
+  }
+  try {
+    const raw = localStorage.getItem(SPOTIFY_AUTH_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (isSpotifyAuth(parsed)) return parsed;
+    }
+  } catch {
+  }
+  return null;
+}
+async function saveSpotifyAuth(auth) {
+  if (hasExtensionStorage2()) {
+    try {
+      await chrome.storage.local.set({ [SPOTIFY_AUTH_KEY]: auth });
+    } catch (err) {
+      console.warn("[spotify] save auth failed", err);
+    }
+  }
+  try {
+    localStorage.setItem(SPOTIFY_AUTH_KEY, JSON.stringify(auth));
+  } catch {
+  }
+}
+async function clearSpotifyAuth() {
+  if (hasExtensionStorage2()) {
+    try {
+      await chrome.storage.local.remove(SPOTIFY_AUTH_KEY);
+    } catch {
+    }
+  }
+  try {
+    localStorage.removeItem(SPOTIFY_AUTH_KEY);
+  } catch {
+  }
+}
+function isSpotifyAuth(value) {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value;
+  return typeof v.accessToken === "string" && typeof v.refreshToken === "string" && typeof v.expiresAt === "number";
+}
+function randomState(bytes = 16) {
+  const arr = new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+function basicAuthHeader(clientId, clientSecret) {
+  return `Basic ${btoa(`${clientId}:${clientSecret}`)}`;
+}
+async function exchangeToken(body, clientId, clientSecret) {
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: basicAuthHeader(clientId, clientSecret)
+    },
+    body
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(
+      `Token exchange failed (${res.status})${text ? `: ${text.slice(0, 200)}` : ""}`
+    );
+  }
+  return await res.json();
+}
+function authFromTokenResponse(data, prevRefresh) {
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token || prevRefresh || "",
+    expiresAt: Date.now() + data.expires_in * 1e3,
+    scope: data.scope
+  };
+}
+async function connectSpotify() {
+  if (!hasSpotifyCredentials()) {
+    throw new Error("Add Spotify Client ID and Secret in settings first.");
+  }
+  if (!hasIdentityApi()) {
+    throw new Error(
+      "Spotify auth needs the extension (chrome.identity). Load unpacked in brave://extensions."
+    );
+  }
+  const clientId = getSettings().spotifyClientId.trim();
+  const clientSecret = getSettings().spotifyClientSecret.trim();
+  const redirectUri = getSpotifyRedirectUri();
+  if (!redirectUri) {
+    throw new Error("Could not get chrome.identity redirect URL.");
+  }
+  const state = randomState();
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: "code",
+    redirect_uri: redirectUri,
+    scope: SPOTIFY_SCOPES,
+    state,
+    show_dialog: "true"
+  });
+  const authUrl = `${AUTHORIZE_URL}?${params.toString()}`;
+  let responseUrl;
+  try {
+    responseUrl = await new Promise((resolve, reject) => {
+      chrome.identity.launchWebAuthFlow(
+        { url: authUrl, interactive: true },
+        (url) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+            return;
+          }
+          resolve(url);
+        }
+      );
+    });
+  } catch (err2) {
+    const msg = err2 instanceof Error ? err2.message : String(err2);
+    if (/canceled|cancelled|user/i.test(msg)) {
+      throw new Error("Auth cancelled.");
+    }
+    throw new Error(msg);
+  }
+  if (!responseUrl) {
+    throw new Error("Auth returned no redirect URL (cancelled?).");
+  }
+  const returned = new URL(responseUrl);
+  const q = returned.searchParams.get("code") != null ? returned.searchParams : new URLSearchParams(returned.hash.replace(/^#/, ""));
+  const err = q.get("error");
+  if (err) {
+    throw new Error(`Spotify auth error: ${err}`);
+  }
+  const code = q.get("code");
+  const returnedState = q.get("state");
+  if (!code) {
+    throw new Error("No authorization code in redirect.");
+  }
+  if (returnedState !== state) {
+    throw new Error("OAuth state mismatch \u2014 try connecting again.");
+  }
+  const tokenBody = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: redirectUri
+  });
+  const data = await exchangeToken(tokenBody, clientId, clientSecret);
+  if (!data.refresh_token) {
+    throw new Error("No refresh token returned \u2014 check app settings / scopes.");
+  }
+  const auth = authFromTokenResponse(data);
+  await saveSpotifyAuth(auth);
+  return auth;
+}
+async function refreshSpotifyToken(auth) {
+  if (!hasSpotifyCredentials()) {
+    throw new Error("Missing Spotify credentials.");
+  }
+  if (!auth.refreshToken) {
+    throw new Error("No refresh token \u2014 reconnect Spotify.");
+  }
+  const clientId = getSettings().spotifyClientId.trim();
+  const clientSecret = getSettings().spotifyClientSecret.trim();
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: auth.refreshToken
+  });
+  const data = await exchangeToken(body, clientId, clientSecret);
+  const next = authFromTokenResponse(data, auth.refreshToken);
+  await saveSpotifyAuth(next);
+  return next;
+}
+async function getValidAccessToken() {
+  let auth = await loadSpotifyAuth();
+  if (!auth?.accessToken) return null;
+  if (auth.expiresAt - EXPIRY_SKEW_MS > Date.now()) {
+    return auth.accessToken;
+  }
+  try {
+    auth = await refreshSpotifyToken(auth);
+    return auth.accessToken;
+  } catch (err) {
+    console.warn("[spotify] refresh failed", err);
+    await clearSpotifyAuth();
+    return null;
+  }
+}
+async function isSpotifyConnected() {
+  const auth = await loadSpotifyAuth();
+  return Boolean(auth?.accessToken && auth?.refreshToken);
+}
+
+// src/features/spotify/api.ts
+var API = "https://api.spotify.com/v1";
+var SpotifyApiError = class extends Error {
+  status;
+  constructor(status, message) {
+    super(message);
+    this.name = "SpotifyApiError";
+    this.status = status;
+  }
+};
+async function spotifyFetch(path, init) {
+  const token = await getValidAccessToken();
+  if (!token) {
+    throw new SpotifyApiError(401, "Not connected to Spotify.");
+  }
+  const res = await fetch(`${API}${path}`, {
+    ...init,
+    headers: {
+      ...init?.headers || {},
+      Authorization: `Bearer ${token}`
+    }
+  });
+  return res;
+}
+async function fetchCurrentlyPlaying() {
+  const res = await spotifyFetch("/me/player/currently-playing");
+  if (res.status === 204) {
+    return null;
+  }
+  if (res.status === 401) {
+    throw new SpotifyApiError(401, "Session expired \u2014 reconnect Spotify.");
+  }
+  if (res.status === 403) {
+    throw new SpotifyApiError(
+      403,
+      "Spotify denied access \u2014 check app mode / scopes."
+    );
+  }
+  if (res.status === 429) {
+    throw new SpotifyApiError(429, "Rate limited \u2014 try again shortly.");
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new SpotifyApiError(
+      res.status,
+      `Spotify API ${res.status}${text ? `: ${text.slice(0, 120)}` : ""}`
+    );
+  }
+  const data = await res.json();
+  const item = data.item;
+  if (!item?.name) {
+    return null;
+  }
+  if (data.currently_playing_type && data.currently_playing_type !== "track") {
+    return null;
+  }
+  const images = item.album?.images ?? [];
+  const art = images.find((i) => (i.width ?? 0) >= 64 && (i.width ?? 0) <= 300) || images[images.length - 1] || images[0];
+  return {
+    isPlaying: Boolean(data.is_playing),
+    progressMs: Number(data.progress_ms) || 0,
+    fetchedAt: Date.now(),
+    track: {
+      id: item.id || "",
+      name: item.name || "Unknown",
+      artists: (item.artists || []).map((a) => a.name || "").filter(Boolean).join(", ") || "Unknown",
+      album: item.album?.name || "",
+      albumArtUrl: art?.url || null,
+      durationMs: Number(item.duration_ms) || 0,
+      externalUrl: item.external_urls?.spotify || null
+    }
+  };
+}
+
+// src/features/spotify/spotify-pane.ts
+var POLL_MS = 8e3;
+var PROGRESS_TICK_MS = 1e3;
+var pollTimer = null;
+var progressTimer = null;
+var lastPlaying = null;
+var fetchInFlight = false;
+var connected = false;
+function setBadge(text, dim = true) {
+  els.spotifyBadge.textContent = text;
+  els.spotifyBadge.classList.toggle("dim", dim);
+}
+function showView(state) {
+  els.spotifySetup.hidden = state !== "setup";
+  els.spotifyAuth.hidden = state !== "auth";
+  els.spotifyIdle.hidden = state !== "idle";
+  els.spotifyLive.hidden = state !== "live";
+}
+function clearError() {
+  els.spotifyError.hidden = true;
+  els.spotifyError.textContent = "";
+}
+function showError(msg) {
+  els.spotifyError.textContent = msg;
+  els.spotifyError.hidden = false;
+}
+function formatMs(ms) {
+  const total = Math.max(0, Math.floor(ms / 1e3));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${pad(s, 2)}`;
+}
+function estimatedProgress(cp) {
+  if (!cp.isPlaying) return cp.progressMs;
+  const elapsed = Date.now() - cp.fetchedAt;
+  return Math.min(cp.progressMs + elapsed, cp.track.durationMs || Infinity);
+}
+function renderLive(cp) {
+  const { track } = cp;
+  els.spTrack.textContent = track.name;
+  if (track.externalUrl) {
+    els.spTrack.href = track.externalUrl;
+    els.spTrack.classList.add("has-link");
+  } else {
+    els.spTrack.removeAttribute("href");
+    els.spTrack.classList.remove("has-link");
+  }
+  els.spArtist.textContent = track.artists;
+  els.spAlbum.textContent = track.album || "";
+  els.spAlbum.hidden = !track.album;
+  if (track.albumArtUrl) {
+    els.spArt.src = track.albumArtUrl;
+    els.spArt.hidden = false;
+    els.spArt.alt = track.album ? `${track.album} cover` : "Album art";
+  } else {
+    els.spArt.removeAttribute("src");
+    els.spArt.hidden = true;
+  }
+  updateProgressUi(cp);
+  setBadge(cp.isPlaying ? "\u25B6" : "\u275A\u275A", false);
+  showView("live");
+  els.spotifyDisconnect.hidden = false;
+  els.spotifyRefresh.hidden = false;
+}
+function updateProgressUi(cp) {
+  const progress = estimatedProgress(cp);
+  const duration = cp.track.durationMs || 0;
+  els.spProgressText.textContent = duration > 0 ? `${formatMs(progress)} / ${formatMs(duration)}` : formatMs(progress);
+  const pct = duration > 0 ? Math.min(100, progress / duration * 100) : 0;
+  els.spBarFill.style.width = `${pct}%`;
+}
+function renderIdle() {
+  lastPlaying = null;
+  setBadge("idle", true);
+  showView("idle");
+  els.spotifyDisconnect.hidden = false;
+  els.spotifyRefresh.hidden = false;
+}
+function renderSetup() {
+  lastPlaying = null;
+  setBadge("setup", true);
+  showView("setup");
+  els.spotifyDisconnect.hidden = true;
+  els.spotifyRefresh.hidden = true;
+  clearError();
+}
+function renderAuth() {
+  lastPlaying = null;
+  setBadge("auth", true);
+  showView("auth");
+  els.spotifyDisconnect.hidden = true;
+  els.spotifyRefresh.hidden = true;
+  clearError();
+}
+function stopProgressTick() {
+  if (progressTimer != null) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
+}
+function startProgressTick() {
+  stopProgressTick();
+  progressTimer = setInterval(() => {
+    if (lastPlaying && !els.spotifyLive.hidden) {
+      updateProgressUi(lastPlaying);
+    }
+  }, PROGRESS_TICK_MS);
+}
+async function refreshNowPlaying(opts) {
+  if (fetchInFlight && !opts?.force) return;
+  if (!connected) return;
+  fetchInFlight = true;
+  try {
+    const cp = await fetchCurrentlyPlaying();
+    clearError();
+    if (!cp) {
+      renderIdle();
+      stopProgressTick();
+      return;
+    }
+    lastPlaying = cp;
+    renderLive(cp);
+    startProgressTick();
+  } catch (err) {
+    if (err instanceof SpotifyApiError && err.status === 401) {
+      connected = false;
+      await clearSpotifyAuth();
+      renderAuth();
+      showError("Session expired \u2014 connect again.");
+      stopProgressTick();
+      return;
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    showError(msg);
+    setBadge("err", true);
+  } finally {
+    fetchInFlight = false;
+  }
+}
+async function syncConnectionState() {
+  if (!hasSpotifyCredentials()) {
+    connected = false;
+    renderSetup();
+    stopPoll();
+    stopProgressTick();
+    return;
+  }
+  connected = await isSpotifyConnected();
+  if (!connected) {
+    renderAuth();
+    stopPoll();
+    stopProgressTick();
+    return;
+  }
+  startPoll();
+  await refreshNowPlaying({ force: true });
+}
+function startPoll() {
+  stopPoll();
+  pollTimer = setInterval(() => {
+    void refreshNowPlaying();
+  }, POLL_MS);
+}
+function stopPoll() {
+  if (pollTimer != null) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+async function onConnectClick() {
+  els.spotifyConnect.disabled = true;
+  els.spotifyConnect.textContent = "Connecting\u2026";
+  clearError();
+  try {
+    await connectSpotify();
+    connected = true;
+    setBadge("ok", false);
+    startPoll();
+    await refreshNowPlaying({ force: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    showError(msg);
+    setBadge("err", true);
+    showView("auth");
+  } finally {
+    els.spotifyConnect.disabled = false;
+    els.spotifyConnect.textContent = "Connect Spotify";
+  }
+}
+async function onDisconnectClick() {
+  await clearSpotifyAuth();
+  connected = false;
+  lastPlaying = null;
+  stopPoll();
+  stopProgressTick();
+  clearError();
+  if (hasSpotifyCredentials()) {
+    renderAuth();
+  } else {
+    renderSetup();
+  }
+}
+async function onSpotifySettingsChanged() {
+  await syncConnectionState();
+}
+function getSpotifyRedirectUriForSettings() {
+  return getSpotifyRedirectUri() || "(load as extension to see redirect URI)";
+}
+function initSpotifyPane() {
+  els.spotifyConnect.addEventListener("click", () => {
+    void onConnectClick();
+  });
+  els.spotifyDisconnect.addEventListener("click", () => {
+    void onDisconnectClick();
+  });
+  els.spotifyRefresh.addEventListener("click", () => {
+    void refreshNowPlaying({ force: true });
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      stopPoll();
+      stopProgressTick();
+    } else if (connected) {
+      startPoll();
+      startProgressTick();
+      void refreshNowPlaying({ force: true });
+    }
+  });
+  void syncConnectionState();
+}
+
 // src/features/weather/weather-pane.ts
 var WEATHER_REFRESH_MS = 15 * 60 * 1e3;
 var WEATHER_CACHE_MS = 10 * 60 * 1e3;
+var UV_YOU_SPF = 3;
+var UV_BABY_PROTECT = 2;
+var UV_HIGH = 6;
+var UV_EXTREME = 8;
+var UV_SCALE_MAX = 11;
+var EXTRA_CITIES = [
+  {
+    id: "london",
+    shortLabel: "London",
+    lat: 51.5074,
+    lon: -0.1278,
+    timezone: "Europe/London"
+  },
+  {
+    id: "knoxville",
+    shortLabel: "Knoxville",
+    lat: 35.9606,
+    lon: -83.9207,
+    timezone: "America/New_York"
+  }
+];
 var weatherCache = null;
 var weatherFetchInFlight = false;
 var lastWeatherZip = "";
+var clockTimer = null;
 function normalizeZip(raw) {
   return String(raw || "").trim();
 }
 function getLastWeatherZip() {
   return lastWeatherZip;
+}
+function shortPlaceLabel(full) {
+  const t = full.trim();
+  if (!t) return "home";
+  const beforeComma = t.split(",")[0]?.trim();
+  return beforeComma || t;
+}
+function localHm(timeZone, now = /* @__PURE__ */ new Date()) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+      hourCycle: "h23"
+    }).formatToParts(now);
+    const num = (type) => Number(parts.find((p) => p.type === type)?.value ?? "0");
+    return { h: num("hour"), m: num("minute"), s: num("second") };
+  } catch {
+    return { h: now.getHours(), m: now.getMinutes(), s: now.getSeconds() };
+  }
+}
+function setClockHands(svg, timeZone) {
+  if (!timeZone) return;
+  svg.dataset.timezone = timeZone;
+  const { h, m, s } = localHm(timeZone);
+  const hourDeg = (h % 12 + m / 60) * 30;
+  const minDeg = (m + s / 60) * 6;
+  const hourHand = svg.querySelector(".wx-clock-hour");
+  const minHand = svg.querySelector(".wx-clock-min");
+  if (hourHand) hourHand.setAttribute("transform", `rotate(${hourDeg} 16 16)`);
+  if (minHand) minHand.setAttribute("transform", `rotate(${minDeg} 16 16)`);
+  const title = svg.closest(".wx-city")?.querySelector(".wx-city-name")?.textContent || "";
+  svg.setAttribute(
+    "aria-label",
+    `${title} local time ${pad(h % 12 || 12)}:${pad(m)}`.trim()
+  );
+}
+function tickClocks() {
+  document.querySelectorAll(".wx-clock[data-timezone]").forEach((svg) => {
+    const tz = svg.dataset.timezone || "";
+    if (tz) setClockHands(svg, tz);
+  });
+}
+function startClockTicker() {
+  tickClocks();
+  if (clockTimer != null) return;
+  clockTimer = setInterval(tickClocks, 1e3);
+}
+function paintHeroTemp(tempEl, temp) {
+  const tempN = temp != null ? Number(temp) : NaN;
+  tempEl.textContent = !Number.isNaN(tempN) ? `${Math.round(tempN)}\xB0F` : "\u2014";
+  tempEl.style.color = !Number.isNaN(tempN) ? tempColor(tempN) : "";
+  tempEl.style.textShadow = !Number.isNaN(tempN) ? `0 0 18px ${tempColor(tempN)}66` : "";
+}
+function paintHeroSky(skyEl, code, title) {
+  skyEl.textContent = skyGlyph(code);
+  skyEl.title = title;
 }
 function windArrow(deg) {
   if (deg == null || Number.isNaN(Number(deg))) return "";
@@ -743,6 +1390,94 @@ function fillCells(container, values, className = "") {
   }
   container.replaceChildren(frag);
 }
+function dayOfWeekLabel(isoDate) {
+  const d = /* @__PURE__ */ new Date(`${isoDate}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return "\u2014";
+  return ["su", "mo", "tu", "we", "th", "fr", "sa"][d.getDay()] ?? "\u2014";
+}
+function renderDay5Temps(daily) {
+  const times = daily.time ?? [];
+  const highs = daily.temperature_2m_max ?? [];
+  const frag = document.createDocumentFragment();
+  const n = Math.min(5, times.length, highs.length);
+  for (let i = 0; i < n; i++) {
+    const day = times[i] ?? "";
+    const hi = highs[i];
+    const item = document.createElement("div");
+    item.className = "wx-day5-item";
+    const dow = document.createElement("span");
+    dow.className = "wx-day5-dow";
+    dow.textContent = dayOfWeekLabel(day);
+    const val = document.createElement("span");
+    val.className = "wx-day5-val";
+    const hiN = hi != null ? Number(hi) : NaN;
+    val.textContent = !Number.isNaN(hiN) ? `${Math.round(hiN)}\xB0` : "\u2014";
+    if (!Number.isNaN(hiN)) {
+      val.style.color = tempColor(hiN);
+      val.style.textShadow = `0 0 10px ${tempColor(hiN)}55`;
+    }
+    item.append(dow, val);
+    frag.appendChild(item);
+  }
+  els.wxDay5Temps.replaceChildren(frag);
+}
+function renderDay5Winds(daily) {
+  const times = daily.time ?? [];
+  const winds = daily.wind_speed_10m_max ?? [];
+  const frag = document.createDocumentFragment();
+  const n = Math.min(5, times.length, winds.length);
+  for (let i = 0; i < n; i++) {
+    const day = times[i] ?? "";
+    const w = winds[i];
+    const item = document.createElement("div");
+    item.className = "wx-day5-item";
+    const dow = document.createElement("span");
+    dow.className = "wx-day5-dow";
+    dow.textContent = dayOfWeekLabel(day);
+    const val = document.createElement("span");
+    val.className = "wx-day5-val";
+    const wN = w != null ? Number(w) : NaN;
+    val.textContent = !Number.isNaN(wN) ? `${Math.round(wN)}` : "\u2014";
+    if (!Number.isNaN(wN)) {
+      val.style.color = windColor(wN);
+      val.style.textShadow = `0 0 10px ${windColor(wN)}55`;
+    }
+    item.append(dow, val);
+    frag.appendChild(item);
+  }
+  els.wxDay5Winds.replaceChildren(frag);
+}
+function renderSpfGuide(uvNow) {
+  const valid = !Number.isNaN(uvNow);
+  const uv = valid ? Math.max(0, uvNow) : 0;
+  els.wxSpfUv.textContent = valid ? uv.toFixed(1) : "\u2014";
+  els.wxSpfUv.style.color = valid ? uvColor(uv) : "";
+  const pct = Math.min(100, uv / UV_SCALE_MAX * 100);
+  els.wxSpfNeedle.style.left = `${pct}%`;
+  const needYou = valid && uv >= UV_YOU_SPF;
+  const needBaby = valid && uv >= UV_BABY_PROTECT;
+  const high = valid && uv >= UV_HIGH;
+  const extreme = valid && uv >= UV_EXTREME;
+  if (!valid || !needYou && !needBaby) {
+    els.wxSpfWarn.hidden = true;
+    els.wxSpfWarn.textContent = "";
+    els.wxSpfWarn.classList.remove("hot");
+    return;
+  }
+  els.wxSpfWarn.hidden = false;
+  els.wxSpfWarn.classList.toggle("hot", high || extreme);
+  if (extreme) {
+    els.wxSpfWarn.textContent = "\u26A0 extreme UV \xB7 SPF now \xB7 baby shade / cover \u2014 stay out of peak sun";
+  } else if (high) {
+    els.wxSpfWarn.textContent = "\u26A0 high UV \xB7 SPF on you \xB7 baby: shade + SPF / long sleeves";
+  } else if (needYou && needBaby) {
+    els.wxSpfWarn.textContent = "SPF on \xB7 baby needs shade/SPF too";
+  } else if (needBaby) {
+    els.wxSpfWarn.textContent = "baby: protect (shade/SPF) \xB7 you still low";
+  } else {
+    els.wxSpfWarn.textContent = "SPF for you \xB7 baby still ok with care";
+  }
+}
 function showWeatherSetup(message) {
   els.weatherSetup.hidden = false;
   els.weatherLive.hidden = true;
@@ -797,32 +1532,55 @@ async function geocodeZip(zip) {
     label: parts.join(", ")
   };
 }
-async function fetchOpenMeteo(lat, lon) {
+async function fetchOpenMeteo(lat, lon, opts = {}) {
+  const full = opts.full ?? true;
   const params = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
-    current: [
+    current: full ? [
       "temperature_2m",
       "relative_humidity_2m",
       "wind_speed_10m",
       "wind_direction_10m",
       "weather_code"
-    ].join(","),
-    hourly: [
-      "temperature_2m",
-      "wind_speed_10m",
-      "wind_direction_10m",
-      "uv_index"
-    ].join(","),
-    daily: ["sunrise", "sunset", "uv_index_max"].join(","),
+    ].join(",") : ["temperature_2m", "weather_code"].join(","),
     temperature_unit: "fahrenheit",
     wind_speed_unit: "mph",
     timezone: "auto",
-    forecast_days: "2"
+    forecast_days: full ? "5" : "1"
   });
+  if (full) {
+    params.set(
+      "hourly",
+      ["temperature_2m", "wind_speed_10m", "wind_direction_10m", "uv_index"].join(
+        ","
+      )
+    );
+    params.set(
+      "daily",
+      [
+        "sunrise",
+        "sunset",
+        "uv_index_max",
+        "temperature_2m_max",
+        "wind_speed_10m_max"
+      ].join(",")
+    );
+  }
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
   if (!res.ok) throw new Error(`forecast failed (${res.status})`);
   return await res.json();
+}
+async function fetchExtraCity(city) {
+  const forecast = await fetchOpenMeteo(city.lat, city.lon, { full: false });
+  const cur = forecast.current ?? {};
+  return {
+    label: city.shortLabel,
+    shortLabel: city.shortLabel,
+    timezone: forecast.timezone || city.timezone,
+    temp: cur.temperature_2m,
+    weatherCode: cur.weather_code
+  };
 }
 function sliceNext12Hours(hourly) {
   const times = hourly.time ?? [];
@@ -857,21 +1615,39 @@ function sliceNext12Hours(hourly) {
   }
   return hours;
 }
-function renderWeather(payload) {
-  const { label, forecast } = payload;
+function renderWeatherBundle(entry) {
+  const { home, extras } = entry;
+  const forecast = home.forecast;
   const cur = forecast.current ?? {};
   const hours = sliceNext12Hours(forecast.hourly ?? {});
   els.weatherSetup.hidden = true;
   els.weatherLive.hidden = false;
   els.wxError.hidden = true;
-  const temp = cur.temperature_2m;
-  const tempN = temp != null ? Number(temp) : NaN;
-  els.wxTemp.textContent = !Number.isNaN(tempN) ? `${Math.round(tempN)}\xB0F` : "\u2014";
-  els.wxTemp.style.color = !Number.isNaN(tempN) ? tempColor(tempN) : "";
-  els.wxTemp.style.textShadow = !Number.isNaN(tempN) ? `0 0 18px ${tempColor(tempN)}66` : "";
-  els.wxPlace.textContent = label || "";
-  els.wxSky.textContent = skyGlyph(cur.weather_code);
-  els.wxSky.title = `weather code ${cur.weather_code ?? "\u2014"}`;
+  paintHeroSky(
+    els.wxSkyHome,
+    cur.weather_code,
+    `weather code ${cur.weather_code ?? "\u2014"}`
+  );
+  paintHeroTemp(els.wxTempHome, cur.temperature_2m);
+  els.wxPlaceHome.textContent = home.label || home.shortLabel;
+  setClockHands(els.wxClockHome, home.timezone);
+  paintHeroSky(
+    els.wxSkyLondon,
+    extras.london.weatherCode,
+    `London \xB7 weather code ${extras.london.weatherCode ?? "\u2014"}`
+  );
+  paintHeroTemp(els.wxTempLondon, extras.london.temp);
+  els.wxPlaceLondon.textContent = extras.london.label;
+  setClockHands(els.wxClockLondon, extras.london.timezone);
+  paintHeroSky(
+    els.wxSkyKnoxville,
+    extras.knoxville.weatherCode,
+    `Knoxville \xB7 weather code ${extras.knoxville.weatherCode ?? "\u2014"}`
+  );
+  paintHeroTemp(els.wxTempKnoxville, extras.knoxville.temp);
+  els.wxPlaceKnoxville.textContent = extras.knoxville.label;
+  setClockHands(els.wxClockKnoxville, extras.knoxville.timezone);
+  startClockTicker();
   const hum = cur.relative_humidity_2m;
   els.wxHumidity.textContent = hum != null ? String(Math.round(hum)) : "\u2014";
   els.wxHumBar.textContent = hum != null ? asciiMeter(hum) : "";
@@ -932,6 +1708,10 @@ function renderWeather(payload) {
     maxCeil: 11,
     chartPx: 32
   });
+  const daily = forecast.daily ?? {};
+  renderDay5Temps(daily);
+  renderDay5Winds(daily);
+  renderSpfGuide(uvNow);
   els.weatherBadge.textContent = "live";
   els.weatherBadge.classList.remove("dim");
 }
@@ -945,7 +1725,7 @@ async function refreshWeather(opts = {}) {
   }
   const cacheHit = !force && weatherCache && weatherCache.zip === zip && Date.now() - weatherCache.at < WEATHER_CACHE_MS;
   if (cacheHit && weatherCache) {
-    renderWeather(weatherCache.data);
+    renderWeatherBundle(weatherCache);
     return;
   }
   if (weatherFetchInFlight) return;
@@ -954,16 +1734,32 @@ async function refreshWeather(opts = {}) {
   els.weatherBadge.classList.add("dim");
   try {
     const geo = await geocodeZip(zip);
-    const forecast = await fetchOpenMeteo(geo.lat, geo.lon);
-    const data = { label: geo.label, forecast };
-    weatherCache = { zip, at: Date.now(), data };
+    const [forecast, london, knoxville] = await Promise.all([
+      fetchOpenMeteo(geo.lat, geo.lon, { full: true }),
+      fetchExtraCity(EXTRA_CITIES[0]),
+      fetchExtraCity(EXTRA_CITIES[1])
+    ]);
+    const homeTz = forecast.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Denver";
+    const home = {
+      label: geo.label,
+      shortLabel: shortPlaceLabel(geo.label),
+      timezone: homeTz,
+      forecast
+    };
+    const entry = {
+      zip,
+      at: Date.now(),
+      home,
+      extras: { london, knoxville }
+    };
+    weatherCache = entry;
     lastWeatherZip = zip;
-    renderWeather(data);
+    renderWeatherBundle(entry);
   } catch (err) {
     console.warn("weather refresh failed", err);
     const msg = err instanceof Error ? err.message : "weather unavailable";
     if (weatherCache?.zip === zip) {
-      renderWeather(weatherCache.data);
+      renderWeatherBundle(weatherCache);
       els.wxError.hidden = false;
       els.wxError.textContent = `stale \xB7 ${msg}`;
     } else {
@@ -975,6 +1771,7 @@ async function refreshWeather(opts = {}) {
 }
 function initWeatherPane() {
   void refreshWeather();
+  startClockTicker();
   setInterval(() => {
     void refreshWeather();
   }, WEATHER_REFRESH_MS);
@@ -1005,6 +1802,11 @@ function fillForm() {
   els.showDeath.checked = Boolean(settings2.showDeath);
   els.zipCode.value = settings2.zipCode || "";
   els.bgImage.value = settings2.bgImage || "";
+  if (isFeatureEnabled("spotify")) {
+    els.spotifyClientId.value = settings2.spotifyClientId || "";
+    els.spotifyClientSecret.value = settings2.spotifyClientSecret || "";
+    els.spotifyRedirectUri.textContent = getSpotifyRedirectUriForSettings();
+  }
   if (isFeatureEnabled("room")) {
     fillRoomSettingsField();
   }
@@ -1022,6 +1824,23 @@ function initSettingsDialog() {
     e.preventDefault();
     closeSettings();
   });
+  if (isFeatureEnabled("spotify")) {
+    els.spotifyRedirectUri.addEventListener("click", async () => {
+      const text = els.spotifyRedirectUri.textContent || "";
+      if (!text || text.startsWith("(")) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        const prev = els.spotifyRedirectUri.title;
+        els.spotifyRedirectUri.title = "Copied!";
+        setTimeout(() => {
+          els.spotifyRedirectUri.title = prev || "Click to copy";
+        }, 1200);
+      } catch {
+      }
+    });
+    els.spotifyRedirectUri.title = "Click to copy";
+    els.spotifyRedirectUri.style.cursor = "pointer";
+  }
   els.settingsForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const prev = getSettings();
@@ -1034,7 +1853,9 @@ function initSettingsDialog() {
       showDeath: els.showDeath.checked,
       zipCode: normalizeZip(els.zipCode.value),
       roomJsonUrl: isFeatureEnabled("room") ? readRoomSettingsField() : prev.roomJsonUrl,
-      bgImage: (els.bgImage.value || "").trim()
+      bgImage: (els.bgImage.value || "").trim(),
+      spotifyClientId: isFeatureEnabled("spotify") ? (els.spotifyClientId.value || "").trim() : prev.spotifyClientId,
+      spotifyClientSecret: isFeatureEnabled("spotify") ? (els.spotifyClientSecret.value || "").trim() : prev.spotifyClientSecret
     });
     applyBackground();
     closeSettings();
@@ -1044,6 +1865,9 @@ function initSettingsDialog() {
     await refreshWeather({
       force: nextZip !== prevZip || nextZip !== getLastWeatherZip()
     });
+    if (isFeatureEnabled("spotify")) {
+      await onSpotifySettingsChanged();
+    }
     if (isFeatureEnabled("room")) {
       const nextRoom = (next.roomJsonUrl || "").trim();
       await refreshRoom({
@@ -1062,6 +1886,9 @@ async function bootstrap() {
   initLifePane();
   if (isFeatureEnabled("weather")) {
     initWeatherPane();
+  }
+  if (isFeatureEnabled("spotify")) {
+    initSpotifyPane();
   }
   if (isFeatureEnabled("room")) {
     const roomEls2 = getRoomEls();

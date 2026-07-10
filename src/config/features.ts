@@ -9,6 +9,8 @@ export const FEATURES = {
   life: true,
   /** Weather TUI via Open-Meteo. */
   weather: true,
+  /** Spotify now-playing (needs client id/secret + user OAuth). */
+  spotify: true,
   /**
    * Room snapshot JSON (recent shouts).
    * Disabled: needs login-aware scrape on the backend first.

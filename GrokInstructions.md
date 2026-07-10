@@ -27,7 +27,7 @@ That extension shows a precise, ticking age (and optional death/deadline countdo
 - Optional death countdown from expected lifespan
 - Dark, warm sandy/leather-ish palette (keep this look; no product rebrand required)
 - **Floating pane / “sexy tmux desktop” layout**: cards float on a desktop shell; monospaced titlebars and TUI chrome, but **not** ASCII-only — optional real **background images**, SVG ring, soft glass panes OK
-- Widget panes: weather (live), stubs for spotify, hn, claude, radar; **room** module exists but **feature-flagged off** until login-aware scrape is designed
+- Widget panes: weather (live), **spotify** (now-playing + OAuth), stubs for hn, claude, radar; **room** module exists but **feature-flagged off** until login-aware scrape is designed
 - Settings persist in **`chrome.storage.local`** (with localStorage mirror + migrate-from-sync)
 - **Never commit secrets** — API keys, private room page URLs, cookies, etc. are local-only
 
@@ -53,6 +53,7 @@ Same settings dialog for first-run and later edits:
 | Show death countdown | Toggle |
 | **Room JSON URL** | Only when `FEATURES.room` is on. One-shot snapshot JSON URL — not a live stream. Hidden while flag is off. |
 | Background image URL | Optional real image behind scrim |
+| **Spotify Client ID / Secret** | When `FEATURES.spotify` is on. Powers now-playing OAuth. Redirect URI shown in dialog. |
 
 ## Planned widgets (fill in details later)
 
@@ -64,10 +65,17 @@ Same settings dialog for first-run and later edits:
 - **Next 12 hours**: temp, wind, and UV — each with colored values and a bar chart directly under that metric (no separate t/w sparkline block)
 - Refresh ~15 min; cache ~10 min; host permissions for Open-Meteo / zippopotam
 
-### Spotify / Now Playing
+### Spotify / Now Playing (live)
 
-- Widget showing what's currently playing on Spotify
-- Details TBD (auth, API, privacy, controls)
+- Compact now-playing pane: album art, track, artist, progress
+- **Settings:** Spotify Client ID + Client Secret (local `chrome.storage` only — never commit)
+- **Redirect URI:** shown in settings (`chrome.identity.getRedirectURL()` → `https://<ext-id>.chromiumapp.org/`). Paste that exact URI into the Spotify Developer Dashboard app settings.
+- **Connect button** on the widget appears only after both credentials are saved; opens Spotify user OAuth via `chrome.identity.launchWebAuthFlow` (Authorization Code + client secret token exchange)
+- Tokens stored separately under `spotifyAuth` (access + refresh); auto-refresh before expiry
+- Scopes: `user-read-currently-playing`, `user-read-playback-state`
+- Poll ~8s while tab visible; ↻ refresh + disconnect on pane
+- Host permissions: `accounts.spotify.com`, `api.spotify.com`; permission: `identity`
+- Dev-mode Spotify apps must add your account under **Users** in the dashboard
 
 ### Mock TUI snippets (shared vibe)
 

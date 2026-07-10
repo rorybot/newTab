@@ -7,6 +7,7 @@
 import { FEATURES, isFeatureEnabled } from "./config/features.js";
 import { initLifePane } from "./features/life/life-pane.js";
 import { initRoomPane } from "./features/room/room-pane.js";
+import { initSpotifyPane } from "./features/spotify/spotify-pane.js";
 import { initWeatherPane } from "./features/weather/weather-pane.js";
 import { applyFeatureVisibility } from "./lib/dom.js";
 import { getSettings, loadSettings } from "./settings/store.js";
@@ -24,6 +25,10 @@ async function bootstrap(): Promise<void> {
 
   if (isFeatureEnabled("weather")) {
     initWeatherPane();
+  }
+
+  if (isFeatureEnabled("spotify")) {
+    initSpotifyPane();
   }
 
   if (isFeatureEnabled("room")) {

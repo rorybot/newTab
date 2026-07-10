@@ -87,12 +87,54 @@
               <p class="muted">temp · humidity · wind · sun · 12h</p>
             </div>
             <div id="weather-live" class="weather-live mono" hidden>
-              <!-- Hero: current conditions -->
-              <div class="wx-hero">
-                <span id="wx-sky" class="wx-sky" aria-hidden="true">·</span>
-                <div class="wx-hero-main">
-                  <span id="wx-temp" class="wx-temp">—</span>
-                  <span id="wx-place" class="wx-place muted"></span>
+              <!-- Heroes: same layout as original (sky · temp+clock · place), ×3 cities -->
+              <div class="wx-heroes">
+                <div class="wx-hero" data-city="home">
+                  <span id="wx-sky-home" class="wx-sky" aria-hidden="true">·</span>
+                  <div class="wx-hero-main">
+                    <div class="wx-temp-row">
+                      <span id="wx-temp-home" class="wx-temp">—</span>
+                      <svg class="wx-clock" id="wx-clock-home" viewBox="0 0 32 32" aria-hidden="true" data-timezone="">
+                        <circle class="wx-clock-face" cx="16" cy="16" r="13.5" />
+                        <line class="wx-clock-hour" x1="16" y1="16" x2="16" y2="9.5" />
+                        <line class="wx-clock-min" x1="16" y1="16" x2="16" y2="6.5" />
+                        <circle class="wx-clock-pin" cx="16" cy="16" r="1.2" />
+                      </svg>
+                    </div>
+                    <span id="wx-place-home" class="wx-place muted"></span>
+                  </div>
+                </div>
+
+                <div class="wx-hero" data-city="london">
+                  <span id="wx-sky-london" class="wx-sky" aria-hidden="true">·</span>
+                  <div class="wx-hero-main">
+                    <div class="wx-temp-row">
+                      <span id="wx-temp-london" class="wx-temp">—</span>
+                      <svg class="wx-clock" id="wx-clock-london" viewBox="0 0 32 32" aria-hidden="true" data-timezone="Europe/London">
+                        <circle class="wx-clock-face" cx="16" cy="16" r="13.5" />
+                        <line class="wx-clock-hour" x1="16" y1="16" x2="16" y2="9.5" />
+                        <line class="wx-clock-min" x1="16" y1="16" x2="16" y2="6.5" />
+                        <circle class="wx-clock-pin" cx="16" cy="16" r="1.2" />
+                      </svg>
+                    </div>
+                    <span id="wx-place-london" class="wx-place muted">London</span>
+                  </div>
+                </div>
+
+                <div class="wx-hero" data-city="knoxville">
+                  <span id="wx-sky-knoxville" class="wx-sky" aria-hidden="true">·</span>
+                  <div class="wx-hero-main">
+                    <div class="wx-temp-row">
+                      <span id="wx-temp-knoxville" class="wx-temp">—</span>
+                      <svg class="wx-clock" id="wx-clock-knoxville" viewBox="0 0 32 32" aria-hidden="true" data-timezone="America/New_York">
+                        <circle class="wx-clock-face" cx="16" cy="16" r="13.5" />
+                        <line class="wx-clock-hour" x1="16" y1="16" x2="16" y2="9.5" />
+                        <line class="wx-clock-min" x1="16" y1="16" x2="16" y2="6.5" />
+                        <circle class="wx-clock-pin" cx="16" cy="16" r="1.2" />
+                      </svg>
+                    </div>
+                    <span id="wx-place-knoxville" class="wx-place muted">Knoxville</span>
+                  </div>
                 </div>
               </div>
 
@@ -116,44 +158,75 @@
                 </span>
               </div>
 
-              <!-- 12h forecast: each metric owns its values + chart -->
-              <div class="wx-forecast" aria-label="Next 12 hours">
+              <!-- 12h forecast + 5-day sides; UV sunscreen scale -->
+              <div class="wx-forecast" aria-label="Next 12 hours and 5-day outlook">
                 <div class="wx-row wx-hours-row">
                   <span class="wx-label muted">hr</span>
                   <div id="wx-hours" class="wx-cells"></div>
                 </div>
 
-                <section class="wx-metric" aria-label="Temperature forecast">
-                  <div class="wx-row">
-                    <span class="wx-label muted">°F</span>
-                    <div id="wx-temps" class="wx-cells"></div>
+                <section class="wx-metric wx-metric-split" aria-label="Temperature forecast">
+                  <div class="wx-metric-main">
+                    <div class="wx-row">
+                      <span class="wx-label muted">°F</span>
+                      <div id="wx-temps" class="wx-cells"></div>
+                    </div>
+                    <div class="wx-row wx-chart-row">
+                      <span class="wx-label muted" aria-hidden="true"></span>
+                      <div id="wx-bars" class="wx-chart" aria-hidden="true"></div>
+                    </div>
                   </div>
-                  <div class="wx-row wx-chart-row">
-                    <span class="wx-label muted" aria-hidden="true"></span>
-                    <div id="wx-bars" class="wx-chart" aria-hidden="true"></div>
-                  </div>
+                  <aside class="wx-day5" aria-label="5-day high temperatures">
+                    <span class="wx-day5-title muted">5d</span>
+                    <div id="wx-day5-temps" class="wx-day5-list"></div>
+                  </aside>
                 </section>
 
-                <section class="wx-metric" aria-label="Wind forecast">
-                  <div class="wx-row">
-                    <span class="wx-label muted">mph</span>
-                    <div id="wx-winds" class="wx-cells"></div>
+                <section class="wx-metric wx-metric-split" aria-label="Wind forecast">
+                  <div class="wx-metric-main">
+                    <div class="wx-row">
+                      <span class="wx-label muted">mph</span>
+                      <div id="wx-winds" class="wx-cells"></div>
+                    </div>
+                    <div class="wx-row wx-chart-row">
+                      <span class="wx-label muted" aria-hidden="true"></span>
+                      <div id="wx-wind-bars" class="wx-chart wx-chart-wind" aria-hidden="true"></div>
+                    </div>
                   </div>
-                  <div class="wx-row wx-chart-row">
-                    <span class="wx-label muted" aria-hidden="true"></span>
-                    <div id="wx-wind-bars" class="wx-chart wx-chart-wind" aria-hidden="true"></div>
-                  </div>
+                  <aside class="wx-day5" aria-label="5-day peak wind">
+                    <span class="wx-day5-title muted">5d</span>
+                    <div id="wx-day5-winds" class="wx-day5-list"></div>
+                  </aside>
                 </section>
 
-                <section class="wx-metric" aria-label="UV index forecast">
-                  <div class="wx-row">
-                    <span class="wx-label muted">uv</span>
-                    <div id="wx-uvs" class="wx-cells"></div>
+                <section class="wx-metric wx-metric-uv" aria-label="UV and sunscreen">
+                  <div class="wx-metric-main">
+                    <div class="wx-row">
+                      <span class="wx-label muted">uv</span>
+                      <div id="wx-uvs" class="wx-cells"></div>
+                    </div>
+                    <div class="wx-row wx-chart-row">
+                      <span class="wx-label muted" aria-hidden="true"></span>
+                      <div id="wx-uv-bars" class="wx-chart wx-chart-uv" aria-hidden="true"></div>
+                    </div>
                   </div>
-                  <div class="wx-row wx-chart-row">
-                    <span class="wx-label muted" aria-hidden="true"></span>
-                    <div id="wx-uv-bars" class="wx-chart wx-chart-uv" aria-hidden="true"></div>
-                  </div>
+                  <aside class="wx-spf" aria-label="Sunscreen guide">
+                    <div class="wx-spf-head">
+                      <span class="wx-spf-title muted">spf</span>
+                      <span id="wx-spf-uv" class="wx-spf-uv">—</span>
+                    </div>
+                    <div class="wx-spf-track" id="wx-spf-track" title="UV index 0–11+">
+                      <div class="wx-spf-grad" aria-hidden="true"></div>
+                      <span class="wx-spf-mark wx-spf-mark-you" id="wx-spf-mark-you" title="You · SPF from UV 3"></span>
+                      <span class="wx-spf-mark wx-spf-mark-baby" id="wx-spf-mark-baby" title="Baby · protection from UV 2"></span>
+                      <span class="wx-spf-needle" id="wx-spf-needle" aria-hidden="true"></span>
+                    </div>
+                    <div class="wx-spf-legend muted">
+                      <span><i class="wx-spf-dot you"></i>you ≥3</span>
+                      <span><i class="wx-spf-dot baby"></i>baby ≥2</span>
+                    </div>
+                    <p id="wx-spf-warn" class="wx-spf-warn" hidden></p>
+                  </aside>
                 </section>
               </div>
               <p id="wx-error" class="wx-error" hidden></p>
@@ -161,18 +234,45 @@
           </div>
         </article>
 
-        <!-- Spotify -->
-        <article class="pane pane-sm" id="spotify-pane">
+        <!-- Spotify now playing -->
+        <article class="pane pane-sm" id="spotify-pane" data-feature="spotify">
           <header class="pane-titlebar">
             <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
             <span class="pane-name">spotify</span>
-            <span class="pane-badge dim">stub</span>
+            <span class="pane-badge dim" id="spotify-badge">…</span>
+            <button type="button" id="spotify-refresh" class="pane-action" title="Refresh now playing" aria-label="Refresh now playing" hidden>↻</button>
           </header>
-          <div class="pane-body">
-            <pre class="tui-stub" aria-hidden="true">♪ ──────────────
-  no track yet
-  ▓▓▓▓▓░░░░░</pre>
-            <p class="pane-placeholder">Now playing — coming soon</p>
+          <div class="pane-body spotify-body">
+            <div id="spotify-setup" class="spotify-setup mono">
+              <p class="muted">set client id &amp; secret in settings</p>
+              <p class="muted">then connect here</p>
+            </div>
+            <div id="spotify-auth" class="spotify-auth mono" hidden>
+              <p class="muted">credentials ready</p>
+              <button type="button" id="spotify-connect" class="btn primary btn-sm">Connect Spotify</button>
+            </div>
+            <div id="spotify-idle" class="spotify-idle mono" hidden>
+              <p class="sp-note">♪ nothing playing</p>
+              <p class="muted">open Spotify on any device</p>
+            </div>
+            <div id="spotify-live" class="spotify-live mono" hidden>
+              <div class="sp-row">
+                <img id="sp-art" class="sp-art" alt="" hidden width="48" height="48" />
+                <div class="sp-meta">
+                  <a id="sp-track" class="sp-track" target="_blank" rel="noopener noreferrer">—</a>
+                  <div id="sp-artist" class="sp-artist muted">—</div>
+                  <div id="sp-album" class="sp-album muted">—</div>
+                </div>
+              </div>
+              <div class="sp-progress-row">
+                <span id="sp-progress-text" class="sp-progress-text muted">0:00 / 0:00</span>
+                <div class="sp-bar" aria-hidden="true">
+                  <div id="sp-bar-fill" class="sp-bar-fill"></div>
+                </div>
+              </div>
+            </div>
+            <p id="spotify-error" class="sp-error mono" hidden></p>
+            <button type="button" id="spotify-disconnect" class="sp-disconnect mono" hidden>disconnect</button>
           </div>
         </article>
 
@@ -309,6 +409,42 @@
           />
         </label>
         <p class="field-hint">Not pure ASCII — real photos/art welcome. Scrim keeps panes readable.</p>
+
+        <div class="settings-section" data-feature="spotify">
+          <h3 class="settings-section-title mono">spotify</h3>
+          <label class="field">
+            <span>Spotify Client ID</span>
+            <input
+              type="text"
+              id="spotify-client-id"
+              name="spotifyClientId"
+              placeholder="from developer.spotify.com"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <label class="field">
+            <span>Spotify Client Secret</span>
+            <input
+              type="password"
+              id="spotify-client-secret"
+              name="spotifyClientSecret"
+              placeholder="local only — never committed"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <p class="field-hint">
+            Create an app at
+            <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer">Spotify Developer Dashboard</a>.
+            Add this exact <strong>Redirect URI</strong>:
+          </p>
+          <p class="field-hint mono settings-code" id="spotify-redirect-uri" title="Click to select">—</p>
+          <p class="field-hint">
+            After saving credentials, use <strong>Connect Spotify</strong> on the widget (user login / consent).
+            Development-mode apps must add your Spotify account under Users.
+          </p>
+        </div>
 
         <div class="settings-actions">
           <button type="button" id="settings-cancel" class="btn ghost">Cancel</button>

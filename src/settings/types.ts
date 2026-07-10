@@ -12,6 +12,10 @@ export interface Settings {
    */
   roomJsonUrl: string;
   bgImage: string;
+  /** Spotify Developer Dashboard → Client ID (local only; never commit). */
+  spotifyClientId: string;
+  /** Spotify Client Secret (local only; never commit). */
+  spotifyClientSecret: string;
 }
 
 export const DEFAULTS: Settings = {
@@ -22,6 +26,19 @@ export const DEFAULTS: Settings = {
   zipCode: "",
   roomJsonUrl: "",
   bgImage: "",
+  spotifyClientId: "",
+  spotifyClientSecret: "",
 };
 
 export const STORAGE_KEY = "newTabSettings";
+
+/** OAuth tokens for Spotify — stored separately from settings form values. */
+export const SPOTIFY_AUTH_KEY = "spotifyAuth";
+
+export interface SpotifyAuth {
+  accessToken: string;
+  refreshToken: string;
+  /** Epoch ms when access token is considered expired. */
+  expiresAt: number;
+  scope?: string;
+}

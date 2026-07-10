@@ -28,21 +28,60 @@ interface OpenMeteoHourly {
 }
 
 interface OpenMeteoDaily {
+  time?: string[];
   sunrise?: string[];
   sunset?: string[];
   uv_index_max?: number[];
+  temperature_2m_max?: number[];
+  wind_speed_10m_max?: number[];
 }
+
+/** EPA/WHO-ish: you SPF ≥3, baby protection ≥2; high/extreme warnings higher. */
+const UV_YOU_SPF = 3;
+const UV_BABY_PROTECT = 2;
+const UV_HIGH = 6;
+const UV_EXTREME = 8;
+const UV_SCALE_MAX = 11;
 
 interface OpenMeteoForecast {
   current?: OpenMeteoCurrent;
   hourly?: OpenMeteoHourly;
   daily?: OpenMeteoDaily;
+  timezone?: string;
 }
 
 interface WeatherPayload {
   label: string;
+  shortLabel: string;
+  timezone: string;
   forecast: OpenMeteoForecast;
 }
+
+interface ExtraCityCurrent {
+  label: string;
+  shortLabel: string;
+  timezone: string;
+  temp: number | undefined;
+  weatherCode: number | undefined;
+}
+
+/** Fixed extra cities shown beside home (from zip). */
+const EXTRA_CITIES = [
+  {
+    id: "london" as const,
+    shortLabel: "London",
+    lat: 51.5074,
+    lon: -0.1278,
+    timezone: "Europe/London",
+  },
+  {
+    id: "knoxville" as const,
+    shortLabel: "Knoxville",
+    lat: 35.9606,
+    lon: -83.9207,
+    timezone: "America/New_York",
+  },
+];
 
 interface HourSlice {
   time: string;
@@ -55,7 +94,11 @@ interface HourSlice {
 interface WeatherCacheEntry {
   zip: string;
   at: number;
-  data: WeatherPayload;
+  home: WeatherPayload;
+  extras: {
+    london: ExtraCityCurrent;
+    knoxville: ExtraCityCurrent;
+  };
 }
 
 interface ColoredCell {
@@ -95,6 +138,7 @@ interface OpenMeteoGeoResponse {
 let weatherCache: WeatherCacheEntry | null = null;
 let weatherFetchInFlight = false;
 let lastWeatherZip = "";
+let clockTimer: ReturnType<typeof setInterval> | null = null;
 
 export function normalizeZip(raw: string | null | undefined): string {
   return String(raw || "").trim();
@@ -102,6 +146,83 @@ export function normalizeZip(raw: string | null | undefined): string {
 
 export function getLastWeatherZip(): string {
   return lastWeatherZip;
+}
+
+function shortPlaceLabel(full: string): string {
+  const t = full.trim();
+  if (!t) return "home";
+  // "Castle Rock, CO 80104" → "Castle Rock"
+  const beforeComma = t.split(",")[0]?.trim();
+  return beforeComma || t;
+}
+
+/** Local hours/minutes in a timezone for analog clock hands. */
+function localHm(timeZone: string, now = new Date()): { h: number; m: number; s: number } {
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+      hourCycle: "h23",
+    }).formatToParts(now);
+    const num = (type: string) =>
+      Number(parts.find((p) => p.type === type)?.value ?? "0");
+    return { h: num("hour"), m: num("minute"), s: num("second") };
+  } catch {
+    return { h: now.getHours(), m: now.getMinutes(), s: now.getSeconds() };
+  }
+}
+
+function setClockHands(svg: SVGSVGElement, timeZone: string): void {
+  if (!timeZone) return;
+  svg.dataset.timezone = timeZone;
+  const { h, m, s } = localHm(timeZone);
+  const hourDeg = ((h % 12) + m / 60) * 30;
+  const minDeg = (m + s / 60) * 6;
+  // SVG transform (not CSS) so origin stays at face center when the icon scales
+  const hourHand = svg.querySelector<SVGLineElement>(".wx-clock-hour");
+  const minHand = svg.querySelector<SVGLineElement>(".wx-clock-min");
+  if (hourHand) hourHand.setAttribute("transform", `rotate(${hourDeg} 16 16)`);
+  if (minHand) minHand.setAttribute("transform", `rotate(${minDeg} 16 16)`);
+  const title =
+    svg.closest(".wx-city")?.querySelector(".wx-city-name")?.textContent || "";
+  svg.setAttribute(
+    "aria-label",
+    `${title} local time ${pad(h % 12 || 12)}:${pad(m)}`.trim(),
+  );
+}
+
+function tickClocks(): void {
+  document.querySelectorAll<SVGSVGElement>(".wx-clock[data-timezone]").forEach((svg) => {
+    const tz = svg.dataset.timezone || "";
+    if (tz) setClockHands(svg, tz);
+  });
+}
+
+function startClockTicker(): void {
+  tickClocks();
+  if (clockTimer != null) return;
+  clockTimer = setInterval(tickClocks, 1000);
+}
+
+/** Same as original single-city temp styling (°F + color). */
+function paintHeroTemp(tempEl: HTMLElement, temp: number | undefined): void {
+  const tempN = temp != null ? Number(temp) : NaN;
+  tempEl.textContent = !Number.isNaN(tempN) ? `${Math.round(tempN)}°F` : "—";
+  tempEl.style.color = !Number.isNaN(tempN) ? tempColor(tempN) : "";
+  tempEl.style.textShadow = !Number.isNaN(tempN)
+    ? `0 0 18px ${tempColor(tempN)}66`
+    : "";
+}
+
+function paintHeroSky(
+  skyEl: HTMLElement,
+  code: number | undefined,
+  title: string,
+): void {
+  skyEl.textContent = skyGlyph(code);
+  skyEl.title = title;
 }
 
 function windArrow(deg: number | null | undefined): string {
@@ -261,6 +382,110 @@ function fillCells(container: HTMLElement, values: string[], className = ""): vo
   container.replaceChildren(frag);
 }
 
+function dayOfWeekLabel(isoDate: string): string {
+  // isoDate is often "2026-07-10" (local date from Open-Meteo)
+  const d = new Date(`${isoDate}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return "—";
+  return ["su", "mo", "tu", "we", "th", "fr", "sa"][d.getDay()] ?? "—";
+}
+
+function renderDay5Temps(daily: OpenMeteoDaily): void {
+  const times = daily.time ?? [];
+  const highs = daily.temperature_2m_max ?? [];
+  const frag = document.createDocumentFragment();
+  const n = Math.min(5, times.length, highs.length);
+  for (let i = 0; i < n; i++) {
+    const day = times[i] ?? "";
+    const hi = highs[i];
+    const item = document.createElement("div");
+    item.className = "wx-day5-item";
+    const dow = document.createElement("span");
+    dow.className = "wx-day5-dow";
+    dow.textContent = dayOfWeekLabel(day);
+    const val = document.createElement("span");
+    val.className = "wx-day5-val";
+    const hiN = hi != null ? Number(hi) : NaN;
+    val.textContent = !Number.isNaN(hiN) ? `${Math.round(hiN)}°` : "—";
+    if (!Number.isNaN(hiN)) {
+      val.style.color = tempColor(hiN);
+      val.style.textShadow = `0 0 10px ${tempColor(hiN)}55`;
+    }
+    item.append(dow, val);
+    frag.appendChild(item);
+  }
+  els.wxDay5Temps.replaceChildren(frag);
+}
+
+function renderDay5Winds(daily: OpenMeteoDaily): void {
+  const times = daily.time ?? [];
+  const winds = daily.wind_speed_10m_max ?? [];
+  const frag = document.createDocumentFragment();
+  const n = Math.min(5, times.length, winds.length);
+  for (let i = 0; i < n; i++) {
+    const day = times[i] ?? "";
+    const w = winds[i];
+    const item = document.createElement("div");
+    item.className = "wx-day5-item";
+    const dow = document.createElement("span");
+    dow.className = "wx-day5-dow";
+    dow.textContent = dayOfWeekLabel(day);
+    const val = document.createElement("span");
+    val.className = "wx-day5-val";
+    const wN = w != null ? Number(w) : NaN;
+    val.textContent = !Number.isNaN(wN) ? `${Math.round(wN)}` : "—";
+    if (!Number.isNaN(wN)) {
+      val.style.color = windColor(wN);
+      val.style.textShadow = `0 0 10px ${windColor(wN)}55`;
+    }
+    item.append(dow, val);
+    frag.appendChild(item);
+  }
+  els.wxDay5Winds.replaceChildren(frag);
+}
+
+/**
+ * Cute UV scale: needle = current UV; ticks for you (SPF ≥3) and baby (≥2).
+ * Warning when at/above those limits (stronger past high/extreme).
+ */
+function renderSpfGuide(uvNow: number): void {
+  const valid = !Number.isNaN(uvNow);
+  const uv = valid ? Math.max(0, uvNow) : 0;
+  els.wxSpfUv.textContent = valid ? uv.toFixed(1) : "—";
+  els.wxSpfUv.style.color = valid ? uvColor(uv) : "";
+
+  const pct = Math.min(100, (uv / UV_SCALE_MAX) * 100);
+  els.wxSpfNeedle.style.left = `${pct}%`;
+
+  const needYou = valid && uv >= UV_YOU_SPF;
+  const needBaby = valid && uv >= UV_BABY_PROTECT;
+  const high = valid && uv >= UV_HIGH;
+  const extreme = valid && uv >= UV_EXTREME;
+
+  if (!valid || (!needYou && !needBaby)) {
+    els.wxSpfWarn.hidden = true;
+    els.wxSpfWarn.textContent = "";
+    els.wxSpfWarn.classList.remove("hot");
+    return;
+  }
+
+  els.wxSpfWarn.hidden = false;
+  els.wxSpfWarn.classList.toggle("hot", high || extreme);
+
+  if (extreme) {
+    els.wxSpfWarn.textContent =
+      "⚠ extreme UV · SPF now · baby shade / cover — stay out of peak sun";
+  } else if (high) {
+    els.wxSpfWarn.textContent =
+      "⚠ high UV · SPF on you · baby: shade + SPF / long sleeves";
+  } else if (needYou && needBaby) {
+    els.wxSpfWarn.textContent = "SPF on · baby needs shade/SPF too";
+  } else if (needBaby) {
+    els.wxSpfWarn.textContent = "baby: protect (shade/SPF) · you still low";
+  } else {
+    els.wxSpfWarn.textContent = "SPF for you · baby still ok with care";
+  }
+}
+
 function showWeatherSetup(message?: string): void {
   els.weatherSetup.hidden = false;
   els.weatherLive.hidden = true;
@@ -319,32 +544,64 @@ async function geocodeZip(zip: string): Promise<GeoResult> {
   };
 }
 
-async function fetchOpenMeteo(lat: number, lon: number): Promise<OpenMeteoForecast> {
+async function fetchOpenMeteo(
+  lat: number,
+  lon: number,
+  opts: { full?: boolean } = {},
+): Promise<OpenMeteoForecast> {
+  const full = opts.full ?? true;
   const params = new URLSearchParams({
     latitude: String(lat),
     longitude: String(lon),
-    current: [
-      "temperature_2m",
-      "relative_humidity_2m",
-      "wind_speed_10m",
-      "wind_direction_10m",
-      "weather_code",
-    ].join(","),
-    hourly: [
-      "temperature_2m",
-      "wind_speed_10m",
-      "wind_direction_10m",
-      "uv_index",
-    ].join(","),
-    daily: ["sunrise", "sunset", "uv_index_max"].join(","),
+    current: full
+      ? [
+          "temperature_2m",
+          "relative_humidity_2m",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "weather_code",
+        ].join(",")
+      : ["temperature_2m", "weather_code"].join(","),
     temperature_unit: "fahrenheit",
     wind_speed_unit: "mph",
     timezone: "auto",
-    forecast_days: "2",
+    forecast_days: full ? "5" : "1",
   });
+  if (full) {
+    params.set(
+      "hourly",
+      ["temperature_2m", "wind_speed_10m", "wind_direction_10m", "uv_index"].join(
+        ",",
+      ),
+    );
+    params.set(
+      "daily",
+      [
+        "sunrise",
+        "sunset",
+        "uv_index_max",
+        "temperature_2m_max",
+        "wind_speed_10m_max",
+      ].join(","),
+    );
+  }
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
   if (!res.ok) throw new Error(`forecast failed (${res.status})`);
   return (await res.json()) as OpenMeteoForecast;
+}
+
+async function fetchExtraCity(
+  city: (typeof EXTRA_CITIES)[number],
+): Promise<ExtraCityCurrent> {
+  const forecast = await fetchOpenMeteo(city.lat, city.lon, { full: false });
+  const cur = forecast.current ?? {};
+  return {
+    label: city.shortLabel,
+    shortLabel: city.shortLabel,
+    timezone: forecast.timezone || city.timezone,
+    temp: cur.temperature_2m,
+    weatherCode: cur.weather_code,
+  };
 }
 
 function sliceNext12Hours(hourly: OpenMeteoHourly): HourSlice[] {
@@ -383,8 +640,9 @@ function sliceNext12Hours(hourly: OpenMeteoHourly): HourSlice[] {
   return hours;
 }
 
-function renderWeather(payload: WeatherPayload): void {
-  const { label, forecast } = payload;
+function renderWeatherBundle(entry: WeatherCacheEntry): void {
+  const { home, extras } = entry;
+  const forecast = home.forecast;
   const cur = forecast.current ?? {};
   const hours = sliceNext12Hours(forecast.hourly ?? {});
 
@@ -392,17 +650,35 @@ function renderWeather(payload: WeatherPayload): void {
   els.weatherLive.hidden = false;
   els.wxError.hidden = true;
 
-  const temp = cur.temperature_2m;
-  const tempN = temp != null ? Number(temp) : NaN;
-  els.wxTemp.textContent = !Number.isNaN(tempN) ? `${Math.round(tempN)}°F` : "—";
-  els.wxTemp.style.color = !Number.isNaN(tempN) ? tempColor(tempN) : "";
-  els.wxTemp.style.textShadow = !Number.isNaN(tempN)
-    ? `0 0 18px ${tempColor(tempN)}66`
-    : "";
-  els.wxPlace.textContent = label || "";
+  // Same original hero block ×3: sky · temp+clock · place
+  paintHeroSky(
+    els.wxSkyHome,
+    cur.weather_code,
+    `weather code ${cur.weather_code ?? "—"}`,
+  );
+  paintHeroTemp(els.wxTempHome, cur.temperature_2m);
+  els.wxPlaceHome.textContent = home.label || home.shortLabel;
+  setClockHands(els.wxClockHome, home.timezone);
 
-  els.wxSky.textContent = skyGlyph(cur.weather_code);
-  els.wxSky.title = `weather code ${cur.weather_code ?? "—"}`;
+  paintHeroSky(
+    els.wxSkyLondon,
+    extras.london.weatherCode,
+    `London · weather code ${extras.london.weatherCode ?? "—"}`,
+  );
+  paintHeroTemp(els.wxTempLondon, extras.london.temp);
+  els.wxPlaceLondon.textContent = extras.london.label;
+  setClockHands(els.wxClockLondon, extras.london.timezone);
+
+  paintHeroSky(
+    els.wxSkyKnoxville,
+    extras.knoxville.weatherCode,
+    `Knoxville · weather code ${extras.knoxville.weatherCode ?? "—"}`,
+  );
+  paintHeroTemp(els.wxTempKnoxville, extras.knoxville.temp);
+  els.wxPlaceKnoxville.textContent = extras.knoxville.label;
+  setClockHands(els.wxClockKnoxville, extras.knoxville.timezone);
+
+  startClockTicker();
 
   const hum = cur.relative_humidity_2m;
   els.wxHumidity.textContent = hum != null ? String(Math.round(hum)) : "—";
@@ -483,6 +759,11 @@ function renderWeather(payload: WeatherPayload): void {
     chartPx: 32,
   });
 
+  const daily = forecast.daily ?? {};
+  renderDay5Temps(daily);
+  renderDay5Winds(daily);
+  renderSpfGuide(uvNow);
+
   els.weatherBadge.textContent = "live";
   els.weatherBadge.classList.remove("dim");
 }
@@ -503,7 +784,7 @@ export async function refreshWeather(opts: { force?: boolean } = {}): Promise<vo
     Date.now() - weatherCache.at < WEATHER_CACHE_MS;
 
   if (cacheHit && weatherCache) {
-    renderWeather(weatherCache.data);
+    renderWeatherBundle(weatherCache);
     return;
   }
 
@@ -514,16 +795,38 @@ export async function refreshWeather(opts: { force?: boolean } = {}): Promise<vo
 
   try {
     const geo = await geocodeZip(zip);
-    const forecast = await fetchOpenMeteo(geo.lat, geo.lon);
-    const data: WeatherPayload = { label: geo.label, forecast };
-    weatherCache = { zip, at: Date.now(), data };
+    const [forecast, london, knoxville] = await Promise.all([
+      fetchOpenMeteo(geo.lat, geo.lon, { full: true }),
+      fetchExtraCity(EXTRA_CITIES[0]!),
+      fetchExtraCity(EXTRA_CITIES[1]!),
+    ]);
+
+    const homeTz =
+      forecast.timezone ||
+      Intl.DateTimeFormat().resolvedOptions().timeZone ||
+      "America/Denver";
+
+    const home: WeatherPayload = {
+      label: geo.label,
+      shortLabel: shortPlaceLabel(geo.label),
+      timezone: homeTz,
+      forecast,
+    };
+
+    const entry: WeatherCacheEntry = {
+      zip,
+      at: Date.now(),
+      home,
+      extras: { london, knoxville },
+    };
+    weatherCache = entry;
     lastWeatherZip = zip;
-    renderWeather(data);
+    renderWeatherBundle(entry);
   } catch (err) {
     console.warn("weather refresh failed", err);
     const msg = err instanceof Error ? err.message : "weather unavailable";
     if (weatherCache?.zip === zip) {
-      renderWeather(weatherCache.data);
+      renderWeatherBundle(weatherCache);
       els.wxError.hidden = false;
       els.wxError.textContent = `stale · ${msg}`;
     } else {
@@ -536,6 +839,7 @@ export async function refreshWeather(opts: { force?: boolean } = {}): Promise<vo
 
 export function initWeatherPane(): void {
   void refreshWeather();
+  startClockTicker();
   setInterval(() => {
     void refreshWeather();
   }, WEATHER_REFRESH_MS);

@@ -6,6 +6,10 @@ import {
   refreshRoom,
 } from "../features/room/room-pane.js";
 import {
+  getSpotifyRedirectUriForSettings,
+  onSpotifySettingsChanged,
+} from "../features/spotify/spotify-pane.js";
+import {
   getLastWeatherZip,
   normalizeZip,
   refreshWeather,
@@ -24,6 +28,11 @@ function fillForm(): void {
   els.showDeath.checked = Boolean(settings.showDeath);
   els.zipCode.value = settings.zipCode || "";
   els.bgImage.value = settings.bgImage || "";
+  if (isFeatureEnabled("spotify")) {
+    els.spotifyClientId.value = settings.spotifyClientId || "";
+    els.spotifyClientSecret.value = settings.spotifyClientSecret || "";
+    els.spotifyRedirectUri.textContent = getSpotifyRedirectUriForSettings();
+  }
   if (isFeatureEnabled("room")) {
     fillRoomSettingsField();
   }
@@ -45,6 +54,25 @@ export function initSettingsDialog(): void {
     closeSettings();
   });
 
+  if (isFeatureEnabled("spotify")) {
+    els.spotifyRedirectUri.addEventListener("click", async () => {
+      const text = els.spotifyRedirectUri.textContent || "";
+      if (!text || text.startsWith("(")) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        const prev = els.spotifyRedirectUri.title;
+        els.spotifyRedirectUri.title = "Copied!";
+        setTimeout(() => {
+          els.spotifyRedirectUri.title = prev || "Click to copy";
+        }, 1200);
+      } catch {
+        /* user can still select-all via CSS */
+      }
+    });
+    els.spotifyRedirectUri.title = "Click to copy";
+    els.spotifyRedirectUri.style.cursor = "pointer";
+  }
+
   els.settingsForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const prev = getSettings();
@@ -61,6 +89,12 @@ export function initSettingsDialog(): void {
         ? readRoomSettingsField()
         : prev.roomJsonUrl,
       bgImage: (els.bgImage.value || "").trim(),
+      spotifyClientId: isFeatureEnabled("spotify")
+        ? (els.spotifyClientId.value || "").trim()
+        : prev.spotifyClientId,
+      spotifyClientSecret: isFeatureEnabled("spotify")
+        ? (els.spotifyClientSecret.value || "").trim()
+        : prev.spotifyClientSecret,
     });
     applyBackground();
     closeSettings();
@@ -71,6 +105,10 @@ export function initSettingsDialog(): void {
     await refreshWeather({
       force: nextZip !== prevZip || nextZip !== getLastWeatherZip(),
     });
+
+    if (isFeatureEnabled("spotify")) {
+      await onSpotifySettingsChanged();
+    }
 
     if (isFeatureEnabled("room")) {
       const nextRoom = (next.roomJsonUrl || "").trim();

@@ -76,7 +76,7 @@ export async function loadSettings(): Promise<Settings> {
 
 /** Persist to chrome.storage.local + localStorage mirror so settings stick. */
 export async function saveSettings(next: Partial<Settings>): Promise<Settings> {
-  settings = { ...DEFAULTS, ...next };
+  settings = { ...DEFAULTS, ...settings, ...next };
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
