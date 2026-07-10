@@ -192,22 +192,6 @@
           </div>
         </article>
 
-        <!-- Private forum feed (URL from settings) -->
-        <article class="pane pane-md" id="forum-pane">
-          <header class="pane-titlebar">
-            <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-            <span class="pane-name">forum</span>
-            <span class="pane-badge dim" id="forum-badge">stub</span>
-          </header>
-          <div class="pane-body">
-            <div class="tui-feed mono" id="forum-feed">
-              <p><span class="muted">#</span> feed · mock</p>
-              <p><span class="accent">›</span> <span class="muted" id="forum-status">set forum URL in settings</span></p>
-              <p class="muted">plain links · img on hover later</p>
-            </div>
-          </div>
-        </article>
-
         <!-- Anthropic chat -->
         <article class="pane pane-md" id="chat-pane">
           <header class="pane-titlebar">
@@ -284,18 +268,6 @@
           <input type="checkbox" id="show-death" name="showDeath" />
           <span>Show death countdown</span>
         </label>
-
-        <label class="field">
-          <span>Forum feed URL</span>
-          <input
-            type="url"
-            id="forum-url"
-            name="forumUrl"
-            placeholder="https://… (your board / new-content URL)"
-            autocomplete="off"
-          />
-        </label>
-        <p class="field-hint">Private — stored only on this browser. Never committed. Powers the forum TUI pane later.</p>
 
         <label class="field">
           <span>Background image URL (optional)</span>

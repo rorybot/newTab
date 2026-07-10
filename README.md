@@ -1,6 +1,6 @@
 # New Tab
 
-Personal Brave/Chrome extension that replaces the new tab page with a floating, tmux-ish pane dashboard: life ring + age clock, weather TUI, plus stub panes for Spotify, HN, forum feed, Claude chat, and local flight radar.
+Personal Brave/Chrome extension that replaces the new tab page with a floating, tmux-ish pane dashboard: life ring + age clock, weather TUI, plus stub panes for Spotify, HN, Claude chat, and local flight radar.
 
 **TypeScript** source under `src/`; build emits `newtab.js` for the extension.
 

@@ -12,8 +12,6 @@ interface Settings {
   showDeath: boolean;
   /** US ZIP / postal — drives weather pane */
   zipCode: string;
-  /** User-supplied board/feed URL — never hardcode a site in the repo */
-  forumUrl: string;
   bgImage: string;
 }
 
@@ -23,7 +21,6 @@ const DEFAULTS: Settings = {
   lifespan: 80,
   showDeath: false,
   zipCode: "",
-  forumUrl: "",
   bgImage: "",
 };
 
@@ -60,11 +57,8 @@ const els = {
   birthTime: requireEl<HTMLInputElement>("birth-time"),
   lifespan: requireEl<HTMLInputElement>("lifespan"),
   showDeath: requireEl<HTMLInputElement>("show-death"),
-  forumUrl: requireEl<HTMLInputElement>("forum-url"),
   bgImage: requireEl<HTMLInputElement>("bg-image"),
   zipCode: requireEl<HTMLInputElement>("zip-code"),
-  forumBadge: requireEl<HTMLElement>("forum-badge"),
-  forumStatus: requireEl<HTMLElement>("forum-status"),
   weatherBadge: requireEl<HTMLElement>("weather-badge"),
   weatherSetup: requireEl<HTMLElement>("weather-setup"),
   weatherLive: requireEl<HTMLElement>("weather-live"),
@@ -390,23 +384,6 @@ function updateAge(): void {
   }
 }
 
-function updateForumPane(): void {
-  const url = (settings.forumUrl || "").trim();
-  if (!url) {
-    els.forumBadge.textContent = "setup";
-    els.forumBadge.classList.add("dim");
-    els.forumStatus.textContent = "set forum URL in settings";
-    return;
-  }
-  els.forumBadge.textContent = "ready";
-  els.forumBadge.classList.remove("dim");
-  try {
-    const host = new URL(url).host;
-    els.forumStatus.textContent = `configured · ${host}`;
-  } catch {
-    els.forumStatus.textContent = "configured · (invalid URL?)";
-  }
-}
 
 // ── Weather (Open-Meteo + zip → lat/lon) ─────────────────────────────
 
@@ -871,7 +848,6 @@ async function refreshWeather(opts: { force?: boolean } = {}): Promise<void> {
 function tick(): void {
   updateClock();
   updateAge();
-  updateForumPane();
 }
 
 function fillForm(): void {
@@ -881,7 +857,6 @@ function fillForm(): void {
   els.lifespan.value = String(settings.lifespan ?? 80);
   els.showDeath.checked = Boolean(settings.showDeath);
   els.zipCode.value = settings.zipCode || "";
-  els.forumUrl.value = settings.forumUrl || "";
   els.bgImage.value = settings.bgImage || "";
 }
 
@@ -909,7 +884,6 @@ els.settingsForm.addEventListener("submit", async (e) => {
     lifespan: Number(els.lifespan.value) || 80,
     showDeath: els.showDeath.checked,
     zipCode: normalizeZip(els.zipCode.value),
-    forumUrl: (els.forumUrl.value || "").trim(),
     bgImage: (els.bgImage.value || "").trim(),
   });
   closeSettings();

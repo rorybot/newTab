@@ -365,15 +365,11 @@ body.has-bg-image .bg-scrim {
     grid-row: 2;
   }
   #hn-pane {
-    grid-column: 1 / span 4;
-    grid-row: 3;
-  }
-  #forum-pane {
-    grid-column: 5 / span 4;
+    grid-column: 1 / span 6;
     grid-row: 3;
   }
   #chat-pane {
-    grid-column: 9 / span 4;
+    grid-column: 7 / span 6;
     grid-row: 3;
   }
 
@@ -389,9 +385,6 @@ body.has-bg-image .bg-scrim {
   }
   #hn-pane {
     transform: translate(0.15rem, 0.2rem);
-  }
-  #forum-pane {
-    transform: translateY(0.35rem);
   }
   #chat-pane {
     transform: translate(-0.15rem, 0.15rem);

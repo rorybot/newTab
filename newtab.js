@@ -6,7 +6,6 @@ var DEFAULTS = {
   lifespan: 80,
   showDeath: false,
   zipCode: "",
-  forumUrl: "",
   bgImage: ""
 };
 var WEATHER_REFRESH_MS = 15 * 60 * 1e3;
@@ -39,11 +38,8 @@ var els = {
   birthTime: requireEl("birth-time"),
   lifespan: requireEl("lifespan"),
   showDeath: requireEl("show-death"),
-  forumUrl: requireEl("forum-url"),
   bgImage: requireEl("bg-image"),
   zipCode: requireEl("zip-code"),
-  forumBadge: requireEl("forum-badge"),
-  forumStatus: requireEl("forum-status"),
   weatherBadge: requireEl("weather-badge"),
   weatherSetup: requireEl("weather-setup"),
   weatherLive: requireEl("weather-live"),
@@ -265,23 +261,6 @@ function updateAge() {
     els.deathCountdown.hidden = false;
   } else {
     els.deathCountdown.hidden = true;
-  }
-}
-function updateForumPane() {
-  const url = (settings.forumUrl || "").trim();
-  if (!url) {
-    els.forumBadge.textContent = "setup";
-    els.forumBadge.classList.add("dim");
-    els.forumStatus.textContent = "set forum URL in settings";
-    return;
-  }
-  els.forumBadge.textContent = "ready";
-  els.forumBadge.classList.remove("dim");
-  try {
-    const host = new URL(url).host;
-    els.forumStatus.textContent = `configured \xB7 ${host}`;
-  } catch {
-    els.forumStatus.textContent = "configured \xB7 (invalid URL?)";
   }
 }
 function normalizeZip(raw) {
@@ -655,7 +634,6 @@ async function refreshWeather(opts = {}) {
 function tick() {
   updateClock();
   updateAge();
-  updateForumPane();
 }
 function fillForm() {
   els.birthDate.value = settings.birthDate || "";
@@ -664,7 +642,6 @@ function fillForm() {
   els.lifespan.value = String(settings.lifespan ?? 80);
   els.showDeath.checked = Boolean(settings.showDeath);
   els.zipCode.value = settings.zipCode || "";
-  els.forumUrl.value = settings.forumUrl || "";
   els.bgImage.value = settings.bgImage || "";
 }
 function openSettings() {
@@ -688,7 +665,6 @@ els.settingsForm.addEventListener("submit", async (e) => {
     lifespan: Number(els.lifespan.value) || 80,
     showDeath: els.showDeath.checked,
     zipCode: normalizeZip(els.zipCode.value),
-    forumUrl: (els.forumUrl.value || "").trim(),
     bgImage: (els.bgImage.value || "").trim()
   });
   closeSettings();

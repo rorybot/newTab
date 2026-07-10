@@ -27,9 +27,9 @@ That extension shows a precise, ticking age (and optional death/deadline countdo
 - Optional death countdown from expected lifespan
 - Dark, warm sandy/leather-ish palette (keep this look; no product rebrand required)
 - **Floating pane / “sexy tmux desktop” layout**: cards float on a desktop shell; monospaced titlebars and TUI chrome, but **not** ASCII-only — optional real **background images**, SVG ring, soft glass panes OK
-- Widget slots stubbed as panes (weather, spotify, hn, forum, claude, radar)
+- Widget slots stubbed as panes (weather, spotify, hn, claude, radar)
 - Settings persist in **`chrome.storage.local`** (with localStorage mirror + migrate-from-sync)
-- **Never commit secrets or private board URLs** — forum feed URL, API keys, etc. are user settings only
+- **Never commit secrets** — API keys, etc. are user settings only
 
 ## Layout / unifying idea
 
@@ -51,7 +51,6 @@ Same settings dialog for first-run and later edits:
 | **Zip code** | Drives weather pane (US ZIP preferred; free Open-Meteo + zippopotam) |
 | Expected lifespan | Ring segments + optional death countdown |
 | Show death countdown | Toggle |
-| **Forum feed URL** | User-supplied; **do not hardcode or document a specific site in the repo**. Operator knows which URL to paste. |
 | Background image URL | Optional real image behind scrim |
 
 ## Planned widgets (fill in details later)
@@ -78,29 +77,10 @@ Several panels share the same idea: **cute, compact mock TUI** slices on the new
 - Compact TUI-style HN front page / story list vibe (like the personal HN reader).
 - Details TBD (API vs mock data, open links, collapse comments, refresh).
 
-### Forum feed mock TUI snippet
-
-A small **mock terminal / TUI-style** activity / “new content” feed pane:
-
-- **Source URL** comes only from settings (`forumUrl`) — never baked into source, README, or these instructions.
-- Present recent-looking posts/threads as a compact monospaced panel (fits the dark sandy theme).
-- **Not** a full forum clone — a snippet that *feels* like a board activity stream.
-
-#### Media / embed rules (important)
-
-Keep the widget lightweight and non-embed-heavy:
-
-| Media | Behavior |
-|-------|----------|
-| **Twitter / X links** | Do **not** expand into cards/embeds. Plain links (or muted URL text) only. |
-| **YouTube** | Do **not** render video embeds/players. Plain links only. |
-| **Images** | Do **not** show inline in the post body. On **hover** over an image link / placeholder, show a small **tooltip-style preview** that appears near the cursor/link and goes away on mouse leave. |
-
-Other rich embeds (iframes, oEmbed previews, etc.) are out of scope unless explicitly added later.
 
 ### Anthropic chat mock TUI snippet
 
-A little **mock TUI chat session** panel powered by the **Anthropic API** (same cute TUI presentation family as HN + forum snippets):
+A little **mock TUI chat session** panel powered by the **Anthropic API** (same cute TUI presentation family as HN snippets):
 
 - Compact terminal-style chat UI on the new tab: message history, prompt input, streaming reply if practical.
 - Host a small local conversation session with Claude via Anthropic’s API (not a full chat product — a snippet for quick thoughts from the new tab).
@@ -122,7 +102,6 @@ A small **planes-around-me** panel for the local area:
 - Chrome Web Store packaging / polished marketing
 - Multi-user onboarding
 - Pixel-perfect clone of Mortality — inspiration, not a fork
-- Documenting or hardcoding private community URLs in git
 
 ## Load in Brave
 
@@ -133,4 +112,4 @@ A small **planes-around-me** panel for the local area:
 
 ## Notes for future sessions
 
-Put deeper weather/Spotify specs, API keys approach, layout tweaks, and feature backlog in this file as we go. Keep private hosts out of the repo.
+Put deeper weather/Spotify specs, API keys approach, layout tweaks, and feature backlog in this file as we go. Keep secrets out of the repo.
