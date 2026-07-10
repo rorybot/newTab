@@ -4,7 +4,13 @@ Personal Brave/Chrome **new tab** extension. Not for public release — just for
 
 ## Tech stack
 
-This is a **TypeScript** project. Prefer TypeScript for all extension logic (new tab UI, widgets, settings, messaging). Keep types strict; avoid adding new plain JavaScript sources unless there is a strong reason.
+This is a **TypeScript** project.
+
+- Source: `src/**/*.ts` (entry `src/newtab.ts`)
+- Build: `npm run build` → esbuild emits `newtab.js` (ESM for the extension page)
+- Typecheck: `npm run typecheck` (`tsc --noEmit`, strict)
+- Prefer TypeScript for all extension logic; do **not** hand-edit `newtab.js`
+- Keep types strict; `@types/chrome` is available for the extension APIs
 
 ## Inspiration
 
