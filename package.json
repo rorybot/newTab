@@ -5,10 +5,10 @@
   "description": "Personal Brave/Chrome new tab extension",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/newtab.ts --bundle --format=esm --target=chrome120 --outfile=newtab.js",
+    "build": "esbuild src/main.ts --bundle --format=esm --target=chrome120 --outfile=newtab.js",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run build",
-    "watch": "esbuild src/newtab.ts --bundle --format=esm --target=chrome120 --outfile=newtab.js --watch"
+    "watch": "esbuild src/main.ts --bundle --format=esm --target=chrome120 --outfile=newtab.js --watch"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",

@@ -8,3 +8,13 @@ dist/
 .env
 .env.*
 *.tsbuildinfo
+
+# Room feed backend (local scrape — secrets / generated)
+backend/.venv/
+backend/venv/
+backend/config.env
+backend/auth.json
+backend/out/
+backend/**/__pycache__/
+*.pyc
+

@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "updatedAt": "2026-07-10T14:32:08Z",
+  "source": "example snapshot (bundled demo — not a live feed)",
+  "messages": [
+    {
+      "id": "shout-row-18001",
+      "user": "Cynegold",
+      "time": "14:18",
+      "text": "just wont stop — pad experiment #3 is cooking",
+      "images": []
+    },
+    {
+      "id": "shout-row-18002",
+      "user": "Logorrheic Amphetamine User",
+      "time": "14:19",
+      "text": "lol same. need coffee + a breakbeat",
+      "images": []
+    },
+    {
+      "id": "shout-row-18003",
+      "user": "tidepool",
+      "time": "14:21",
+      "text": "anyone got a clean 808 kit share?",
+      "images": []
+    },
+    {
+      "id": "shout-row-18004",
+      "user": "bitmoth",
+      "time": "14:22",
+      "text": "try this: https://example.com/kits/soft-808s.zip",
+      "images": []
+    },
+    {
+      "id": "shout-row-18005",
+      "user": "Cynegold",
+      "time": "14:24",
+      "text": "screenshot of the grid [img]",
+      "images": ["https://picsum.photos/seed/roomdemo/640/360"]
+    },
+    {
+      "id": "shout-row-18006",
+      "user": "nori",
+      "time": "14:26",
+      "text": "watched https://www.youtube.com/watch?v=dQw4w9WgXcQ — plain link only, no embed",
+      "images": []
+    },
+    {
+      "id": "shout-row-18007",
+      "user": "tidepool",
+      "time": "14:28",
+      "text": "shipping a loop tonight if the rain holds",
+      "images": []
+    },
+    {
+      "id": "shout-row-18008",
+      "user": "bitmoth",
+      "time": "14:31",
+      "text": "g2g — leave the channel warm",
+      "images": []
+    }
+  ]
+}

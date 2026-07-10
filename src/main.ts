@@ -1,0 +1,49 @@
+/**
+ * New Tab — floating pane dashboard (entry).
+ *
+ * Modules live under src/features/*, src/settings/*, src/ui/*, src/config/*.
+ */
+
+import { FEATURES, isFeatureEnabled } from "./config/features.js";
+import { initLifePane } from "./features/life/life-pane.js";
+import { initRoomPane } from "./features/room/room-pane.js";
+import { initWeatherPane } from "./features/weather/weather-pane.js";
+import { applyFeatureVisibility } from "./lib/dom.js";
+import { getSettings, loadSettings } from "./settings/store.js";
+import { applyBackground } from "./ui/background.js";
+import { getRoomEls } from "./ui/refs.js";
+import { initSettingsDialog, openSettings } from "./ui/settings-dialog.js";
+
+async function bootstrap(): Promise<void> {
+  applyFeatureVisibility(FEATURES);
+
+  await loadSettings();
+  applyBackground();
+  initSettingsDialog();
+  initLifePane();
+
+  if (isFeatureEnabled("weather")) {
+    initWeatherPane();
+  }
+
+  if (isFeatureEnabled("room")) {
+    const roomEls = getRoomEls();
+    if (roomEls) {
+      initRoomPane(roomEls);
+    } else {
+      console.warn("[newtab] FEATURES.room on but room DOM missing");
+    }
+  } else {
+    console.info(
+      "[newtab] room feature flagged off (login/scrape TBD) — enable in src/config/features.ts",
+    );
+  }
+
+  if (!getSettings().birthDate) {
+    setTimeout(openSettings, 350);
+  }
+}
+
+void bootstrap().catch((err: unknown) => {
+  console.error("[newtab] bootstrap failed", err);
+});

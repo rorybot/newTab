@@ -192,6 +192,20 @@
           </div>
         </article>
 
+        <!-- Room: one-shot snapshot (feature-flagged; off until login scrape is designed) -->
+        <article class="pane pane-md pane-room" id="room-pane" data-feature="room">
+          <header class="pane-titlebar">
+            <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="pane-name">room</span>
+            <span class="pane-badge dim" id="room-badge">…</span>
+            <button type="button" id="room-refresh" class="pane-action" title="Reload snapshot JSON" aria-label="Reload room snapshot">↻</button>
+          </header>
+          <div class="pane-body room-body">
+            <p id="room-status" class="room-status mono muted">loading…</p>
+            <div id="room-log" class="room-log mono" role="log" aria-live="polite" aria-relevant="additions"></div>
+          </div>
+        </article>
+
         <!-- Anthropic chat -->
         <article class="pane pane-md" id="chat-pane">
           <header class="pane-titlebar">
@@ -269,6 +283,21 @@
           <span>Show death countdown</span>
         </label>
 
+        <div data-feature="room">
+          <label class="field">
+            <span>Room snapshot JSON URL</span>
+            <input
+              type="url"
+              id="room-json-url"
+              name="roomJsonUrl"
+              placeholder="http://127.0.0.1:8765/room-feed.json"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <p class="field-hint">One-shot snapshot of recent shouts (not a live feed). Point at JSON from a one-time scrape (<code>backend/</code>). Empty = bundled example. ↻ only reloads that file. Feature currently flagged off until login-aware scrape is ready.</p>
+        </div>
+
         <label class="field">
           <span>Background image URL (optional)</span>
           <input
@@ -287,6 +316,10 @@
         </div>
       </form>
     </dialog>
+
+    <div id="img-tooltip" class="img-tooltip" data-feature="room" hidden>
+      <img id="img-tooltip-src" alt="" />
+    </div>
 
     <script src="newtab.js" type="module"></script>
   </body>

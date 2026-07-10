@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "New Tab",
-  "version": "0.1.0",
+  "version": "0.1.12",
   "description": "Personal new tab — mortality clock, weather, Spotify, and whatever else I want.",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
@@ -12,7 +12,17 @@
   "host_permissions": [
     "https://api.open-meteo.com/*",
     "https://geocoding-api.open-meteo.com/*",
-    "https://api.zippopotam.us/*"
+    "https://api.zippopotam.us/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "https://127.0.0.1/*",
+    "https://localhost/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["examples/*"],
+      "matches": ["<all_urls>"]
+    }
   ],
   "icons": {
     "16": "icons/icon16.png",

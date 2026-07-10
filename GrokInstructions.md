@@ -4,13 +4,13 @@ Personal Brave/Chrome **new tab** extension. Not for public release — just for
 
 ## Tech stack
 
-This is a **TypeScript** project.
+This is a **TypeScript** project with a modular layout.
 
-- Source: `src/**/*.ts` (entry `src/newtab.ts`)
-- Build: `npm run build` → esbuild emits `newtab.js` (ESM for the extension page)
-- Typecheck: `npm run typecheck` (`tsc --noEmit`, strict)
-- Prefer TypeScript for all extension logic; do **not** hand-edit `newtab.js`
-- Keep types strict; `@types/chrome` is available for the extension APIs
+- Entry: `src/main.ts` → esbuild bundle `newtab.js`
+- Features: `src/features/<name>/` (life, weather, room, …)
+- Shared: `src/lib/`, `src/settings/`, `src/ui/`, `src/config/features.ts` (flags)
+- Build: `npm run build` / `npm run typecheck` — do **not** hand-edit `newtab.js`
+- Keep types strict; `@types/chrome` is available
 
 ## Inspiration
 
@@ -27,9 +27,9 @@ That extension shows a precise, ticking age (and optional death/deadline countdo
 - Optional death countdown from expected lifespan
 - Dark, warm sandy/leather-ish palette (keep this look; no product rebrand required)
 - **Floating pane / “sexy tmux desktop” layout**: cards float on a desktop shell; monospaced titlebars and TUI chrome, but **not** ASCII-only — optional real **background images**, SVG ring, soft glass panes OK
-- Widget slots stubbed as panes (weather, spotify, hn, claude, radar)
+- Widget panes: weather (live), stubs for spotify, hn, claude, radar; **room** module exists but **feature-flagged off** until login-aware scrape is designed
 - Settings persist in **`chrome.storage.local`** (with localStorage mirror + migrate-from-sync)
-- **Never commit secrets** — API keys, etc. are user settings only
+- **Never commit secrets** — API keys, private room page URLs, cookies, etc. are local-only
 
 ## Layout / unifying idea
 
@@ -51,6 +51,7 @@ Same settings dialog for first-run and later edits:
 | **Zip code** | Drives weather pane (US ZIP preferred; free Open-Meteo + zippopotam) |
 | Expected lifespan | Ring segments + optional death countdown |
 | Show death countdown | Toggle |
+| **Room JSON URL** | Only when `FEATURES.room` is on. One-shot snapshot JSON URL — not a live stream. Hidden while flag is off. |
 | Background image URL | Optional real image behind scrim |
 
 ## Planned widgets (fill in details later)
@@ -77,6 +78,45 @@ Several panels share the same idea: **cute, compact mock TUI** slices on the new
 - Compact TUI-style HN front page / story list vibe (like the personal HN reader).
 - Details TBD (API vs mock data, open links, collapse comments, refresh).
 
+### Room / recent shouts (one-shot JSON snapshot) — **OFF**
+
+**Status:** `FEATURES.room = false` in `src/config/features.ts`. Code lives under `src/features/room/`; UI is `[data-feature="room"]` and stays hidden. Revisit when scrape can **log in** (session / Playwright storage).
+
+**Not a live chatroom feed.** Goal: **read what was said recently** — one frozen snapshot.
+
+1. **Backend (once):** scrape (after login) → write JSON. Not a continuous feed.
+2. **Extension:** `fetch` that JSON URL and render. **↻** reloads the file only.
+3. No scrape inside the extension. `backend/` is a local experiment; production needs server architecture (see README).
+
+**Blocker:** private room pages require authentication before scrape is useful.
+
+#### JSON shape (v1)
+
+```json
+{
+  "version": 1,
+  "updatedAt": "ISO-8601",
+  "source": "optional label",
+  "messages": [
+    { "id": "shout-row-123", "user": "Name", "time": "14:01", "text": "…", "images": [] }
+  ]
+}
+```
+
+#### Media / embed rules
+
+| Media | Behavior |
+|-------|----------|
+| **Twitter / X links** | Plain link text only (no cards). |
+| **YouTube** | Plain links only (no embeds). |
+| **Images** | No inline images. `[img]` placeholder; **hover** shows a small tooltip preview. |
+
+#### Backend (`backend/`)
+
+- `scrape_room.py` — **one-time** Playwright scrape of `shout-row-*` → write `out/room-feed.json` (and print summary). Not a daemon / not continuous.
+- `serve_feed.py` — **local-only** long-running mini HTTP server so the extension can `fetch` the file; not production.
+- Production still needs server-side architecture: scheduled scrape + serve JSON (Compose + Caddy/nginx is enough; Dokploy/Coolify if you want a multi-app manager). See root README note.
+- Do not commit `config.env`, `auth.json`, or scraped output
 
 ### Anthropic chat mock TUI snippet
 

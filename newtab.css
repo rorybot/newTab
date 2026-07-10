@@ -365,11 +365,15 @@ body.has-bg-image .bg-scrim {
     grid-row: 2;
   }
   #hn-pane {
-    grid-column: 1 / span 6;
+    grid-column: 1 / span 4;
+    grid-row: 3;
+  }
+  #room-pane {
+    grid-column: 5 / span 4;
     grid-row: 3;
   }
   #chat-pane {
-    grid-column: 7 / span 6;
+    grid-column: 9 / span 4;
     grid-row: 3;
   }
 
@@ -385,6 +389,9 @@ body.has-bg-image .bg-scrim {
   }
   #hn-pane {
     transform: translate(0.15rem, 0.2rem);
+  }
+  #room-pane {
+    transform: translateY(0.35rem);
   }
   #chat-pane {
     transform: translate(-0.15rem, 0.15rem);
@@ -757,6 +764,157 @@ body.has-bg-image .bg-scrim {
   margin: 0.2rem 0 0;
   font-size: 0.72rem;
   color: var(--danger);
+}
+
+/* Feature flags: [data-feature] hidden when flag is off (see src/config/features.ts) */
+[data-feature].feature-off,
+[data-feature][hidden] {
+  display: none !important;
+}
+
+/* ── Room snapshot log (FEATURES.room) ── */
+
+.pane-room {
+  min-height: 16rem;
+}
+
+.pane-action {
+  appearance: none;
+  margin-left: 0.25rem;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-muted);
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.pane-action:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.pane-titlebar .pane-badge {
+  margin-left: auto;
+}
+
+.pane-titlebar .pane-action {
+  margin-left: 0.35rem;
+}
+
+.room-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-height: 12rem;
+  max-height: 22rem;
+  padding-top: 0.55rem;
+}
+
+.room-status {
+  margin: 0;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.room-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-right: 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.room-msg {
+  border-left: 2px solid rgba(196, 165, 116, 0.25);
+  padding: 0.15rem 0 0.15rem 0.55rem;
+}
+
+.room-msg-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.55rem;
+  margin-bottom: 0.15rem;
+  font-size: 0.72rem;
+}
+
+.room-user {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.room-time {
+  color: var(--text-muted);
+  opacity: 0.85;
+  font-size: 0.65rem;
+}
+
+.room-text {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.room-text a.room-link {
+  color: #8eb4c4;
+  text-decoration: none;
+  border-bottom: 1px dotted rgba(142, 180, 196, 0.45);
+}
+
+.room-text a.room-link:hover {
+  color: var(--accent);
+}
+
+.room-img-ref {
+  display: inline;
+  color: #c4a574;
+  cursor: default;
+  border-bottom: 1px dotted rgba(196, 165, 116, 0.5);
+  font-size: 0.72rem;
+}
+
+.room-empty {
+  margin: 0.5rem 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.img-tooltip {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  padding: 4px;
+  background: #161412;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  max-width: min(280px, 70vw);
+  max-height: min(220px, 50vh);
+}
+
+.img-tooltip[hidden] {
+  display: none;
+}
+
+.img-tooltip img {
+  display: block;
+  max-width: 100%;
+  max-height: min(200px, 48vh);
+  object-fit: contain;
+  border-radius: 4px;
 }
 
 /* ── Stub TUI bits ── */

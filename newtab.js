@@ -1,23 +1,171 @@
-// src/newtab.ts
-var STORAGE_KEY = "newTabSettings";
+// src/config/features.ts
+var FEATURES = {
+  /** Life ring + age clock (core). */
+  life: true,
+  /** Weather TUI via Open-Meteo. */
+  weather: true,
+  /**
+   * Room snapshot JSON (recent shouts).
+   * Disabled: needs login-aware scrape on the backend first.
+   */
+  room: false
+};
+function isFeatureEnabled(name) {
+  return FEATURES[name] === true;
+}
+
+// src/lib/age.ts
+var YEAR_MS = 365.2425 * 24 * 60 * 60 * 1e3;
+function parseBirthDateTime(birthDate, birthTime) {
+  if (!birthDate) return null;
+  const time = birthTime && birthTime.length >= 5 ? birthTime : "00:00:00";
+  const normalized = time.length === 5 ? `${time}:00` : time;
+  const d = /* @__PURE__ */ new Date(`${birthDate}T${normalized}`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+function ageInYears(birth, now = /* @__PURE__ */ new Date()) {
+  const ms = now.getTime() - birth.getTime();
+  if (ms < 0) return 0;
+  return ms / YEAR_MS;
+}
+function expectedDeathDate(birth, lifespanYears) {
+  return new Date(birth.getTime() + lifespanYears * YEAR_MS);
+}
+
+// src/lib/format.ts
+function pad(n, width = 2) {
+  return String(n).padStart(width, "0");
+}
+function formatClock(date) {
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec"
+  ];
+  return `${days[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()} \xB7 ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+function formatDuration(ms) {
+  if (ms <= 0) return "0 days";
+  const totalSeconds = Math.floor(ms / 1e3);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor(totalSeconds % 86400 / 3600);
+  const minutes = Math.floor(totalSeconds % 3600 / 60);
+  const seconds = totalSeconds % 60;
+  return `${days.toLocaleString()}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
+}
+function formatAge(years) {
+  return years.toFixed(9);
+}
+
+// src/settings/types.ts
 var DEFAULTS = {
   birthDate: "",
   birthTime: "00:00:00",
   lifespan: 80,
   showDeath: false,
   zipCode: "",
+  roomJsonUrl: "",
   bgImage: ""
 };
-var WEATHER_REFRESH_MS = 15 * 60 * 1e3;
-var WEATHER_CACHE_MS = 10 * 60 * 1e3;
-var RING_R = 82;
-var RING_CX = 100;
-var RING_CY = 100;
+var STORAGE_KEY = "newTabSettings";
+
+// src/settings/store.ts
+var settings = { ...DEFAULTS };
+var onChange = null;
+function getSettings() {
+  return settings;
+}
+function notify() {
+  onChange?.(settings);
+}
+function hasExtensionStorage() {
+  return typeof chrome !== "undefined" && chrome?.storage?.local != null;
+}
+function isSettingsPartial(value) {
+  return typeof value === "object" && value !== null;
+}
+async function loadSettings() {
+  let loaded = null;
+  if (hasExtensionStorage()) {
+    try {
+      const localResult = await chrome.storage.local.get(STORAGE_KEY);
+      const raw = localResult[STORAGE_KEY];
+      if (isSettingsPartial(raw)) loaded = raw;
+    } catch {
+    }
+    if (!loaded && chrome.storage.sync) {
+      try {
+        const syncResult = await chrome.storage.sync.get(STORAGE_KEY);
+        const raw = syncResult[STORAGE_KEY];
+        if (isSettingsPartial(raw)) {
+          loaded = raw;
+          try {
+            await chrome.storage.local.set({ [STORAGE_KEY]: loaded });
+          } catch {
+          }
+        }
+      } catch {
+      }
+    }
+  }
+  if (!loaded) {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (isSettingsPartial(parsed)) loaded = parsed;
+      }
+    } catch {
+    }
+  }
+  settings = loaded ? { ...DEFAULTS, ...loaded } : { ...DEFAULTS };
+  notify();
+  return settings;
+}
+async function saveSettings(next) {
+  settings = { ...DEFAULTS, ...next };
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+  }
+  if (hasExtensionStorage()) {
+    try {
+      await chrome.storage.local.set({ [STORAGE_KEY]: settings });
+    } catch (err) {
+      console.warn("chrome.storage.local.set failed", err);
+    }
+  }
+  notify();
+  return settings;
+}
+
+// src/lib/dom.ts
 function requireEl(id) {
   const el = document.getElementById(id);
   if (!el) throw new Error(`Missing required element #${id}`);
   return el;
 }
+function applyFeatureVisibility(flags) {
+  document.querySelectorAll("[data-feature]").forEach((el) => {
+    const name = el.dataset.feature;
+    if (!name) return;
+    const on = flags[name] === true;
+    el.hidden = !on;
+    el.classList.toggle("feature-off", !on);
+  });
+}
+
+// src/ui/refs.ts
 var els = {
   clock: requireEl("clock"),
   ageDisplay: requireEl("age-display"),
@@ -62,131 +210,35 @@ var els = {
   wxUv: requireEl("wx-uv"),
   wxError: requireEl("wx-error")
 };
-var settings = { ...DEFAULTS };
-var ticksDrawnFor = null;
-var weatherCache = null;
-var weatherFetchInFlight = false;
-var lastWeatherZip = "";
-function pad(n, width = 2) {
-  return String(n).padStart(width, "0");
-}
-function formatClock(date) {
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const months = [
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec"
+function getRoomEls() {
+  const ids = [
+    "room-json-url",
+    "room-badge",
+    "room-status",
+    "room-log",
+    "room-refresh",
+    "img-tooltip",
+    "img-tooltip-src"
   ];
-  return `${days[date.getDay()]} ${months[date.getMonth()]} ${date.getDate()} \xB7 ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-}
-function parseBirthDateTime(birthDate, birthTime) {
-  if (!birthDate) return null;
-  const time = birthTime && birthTime.length >= 5 ? birthTime : "00:00:00";
-  const normalized = time.length === 5 ? `${time}:00` : time;
-  const d = /* @__PURE__ */ new Date(`${birthDate}T${normalized}`);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-function ageInYears(birth, now = /* @__PURE__ */ new Date()) {
-  const ms = now.getTime() - birth.getTime();
-  if (ms < 0) return 0;
-  const yearMs = 365.2425 * 24 * 60 * 60 * 1e3;
-  return ms / yearMs;
-}
-function formatAge(years) {
-  return years.toFixed(9);
-}
-function formatDuration(ms) {
-  if (ms <= 0) return "0 days";
-  const totalSeconds = Math.floor(ms / 1e3);
-  const days = Math.floor(totalSeconds / 86400);
-  const hours = Math.floor(totalSeconds % 86400 / 3600);
-  const minutes = Math.floor(totalSeconds % 3600 / 60);
-  const seconds = totalSeconds % 60;
-  return `${days.toLocaleString()}d ${pad(hours)}h ${pad(minutes)}m ${pad(seconds)}s`;
-}
-function expectedDeathDate(birth, lifespanYears) {
-  const yearMs = 365.2425 * 24 * 60 * 60 * 1e3;
-  return new Date(birth.getTime() + lifespanYears * yearMs);
-}
-function hasExtensionStorage() {
-  return typeof chrome !== "undefined" && chrome?.storage?.local != null;
-}
-function isSettingsPartial(value) {
-  return typeof value === "object" && value !== null;
-}
-async function loadSettings() {
-  let loaded = null;
-  if (hasExtensionStorage()) {
-    try {
-      const localResult = await chrome.storage.local.get(STORAGE_KEY);
-      const raw = localResult[STORAGE_KEY];
-      if (isSettingsPartial(raw)) loaded = raw;
-    } catch {
-    }
-    if (!loaded && chrome.storage.sync) {
-      try {
-        const syncResult = await chrome.storage.sync.get(STORAGE_KEY);
-        const raw = syncResult[STORAGE_KEY];
-        if (isSettingsPartial(raw)) {
-          loaded = raw;
-          try {
-            await chrome.storage.local.set({ [STORAGE_KEY]: loaded });
-          } catch {
-          }
-        }
-      } catch {
-      }
-    }
+  for (const id of ids) {
+    if (!document.getElementById(id)) return null;
   }
-  if (!loaded) {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (isSettingsPartial(parsed)) loaded = parsed;
-      }
-    } catch {
-    }
-  }
-  settings = loaded ? { ...DEFAULTS, ...loaded } : { ...DEFAULTS };
+  return {
+    roomJsonUrl: requireEl("room-json-url"),
+    roomBadge: requireEl("room-badge"),
+    roomStatus: requireEl("room-status"),
+    roomLog: requireEl("room-log"),
+    roomRefresh: requireEl("room-refresh"),
+    imgTooltip: requireEl("img-tooltip"),
+    imgTooltipSrc: requireEl("img-tooltip-src")
+  };
 }
-async function saveSettings(next) {
-  settings = { ...DEFAULTS, ...next };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  } catch {
-  }
-  if (hasExtensionStorage()) {
-    try {
-      await chrome.storage.local.set({ [STORAGE_KEY]: settings });
-    } catch (err) {
-      console.warn("chrome.storage.local.set failed", err);
-    }
-  }
-  applyBackground();
-}
-function applyBackground() {
-  const url = (settings.bgImage || "").trim();
-  if (url) {
-    els.bgLayer.classList.add("has-image");
-    document.body.classList.add("has-bg-image");
-    const safe = url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    els.bgLayer.style.backgroundImage = `url("${safe}")`;
-  } else {
-    els.bgLayer.classList.remove("has-image");
-    document.body.classList.remove("has-bg-image");
-    els.bgLayer.style.backgroundImage = "";
-  }
-}
+
+// src/features/life/life-pane.ts
+var RING_R = 82;
+var RING_CX = 100;
+var RING_CY = 100;
+var ticksDrawnFor = null;
 function updateClock() {
   const now = /* @__PURE__ */ new Date();
   els.clock.textContent = formatClock(now);
@@ -225,8 +277,9 @@ function updateRing(livedFraction) {
   els.ringRemaining.style.strokeDasharray = `0 ${lived} ${remain} 0`;
 }
 function updateAge() {
-  const birth = parseBirthDateTime(settings.birthDate, settings.birthTime);
-  const lifespan = Number(settings.lifespan) || 80;
+  const settings2 = getSettings();
+  const birth = parseBirthDateTime(settings2.birthDate, settings2.birthTime);
+  const lifespan = Number(settings2.lifespan) || 80;
   ensureRingTicks(lifespan);
   if (!birth) {
     els.lifePane.classList.add("needs-setup");
@@ -250,7 +303,7 @@ function updateAge() {
   const decade = Math.floor(years / 10) * 10;
   const yearInDecade = wholeYears - decade;
   els.lifeSegments.textContent = `segment ${wholeYears + 1}/${lifespan} \xB7 decade ${decade}\u2013${decade + 9} \xB7 +${yearInDecade}y in block \xB7 ${Math.max(0, lifespan - years).toFixed(2)}y est. left`;
-  if (settings.showDeath) {
+  if (settings2.showDeath) {
     const death = expectedDeathDate(birth, lifespan);
     const remaining = death.getTime() - now.getTime();
     if (remaining > 0) {
@@ -263,8 +316,297 @@ function updateAge() {
     els.deathCountdown.hidden = true;
   }
 }
+function tickLife() {
+  updateClock();
+  updateAge();
+}
+function initLifePane() {
+  tickLife();
+  setInterval(tickLife, 50);
+}
+
+// src/features/room/room-pane.ts
+var ROOM_DEMO_PATH = "examples/room-feed.example.json";
+var URL_IN_TEXT_RE = /(https?:\/\/[^\s<>"']+)/gi;
+var roomEls = null;
+var roomFetchInFlight = false;
+var lastRoomUrl = "";
+function setRoomStatus(text) {
+  if (!roomEls) return;
+  roomEls.roomStatus.textContent = text;
+}
+function demoRoomFeedUrl() {
+  if (typeof chrome !== "undefined" && chrome.runtime?.getURL) {
+    return chrome.runtime.getURL(ROOM_DEMO_PATH);
+  }
+  return ROOM_DEMO_PATH;
+}
+function resolveRoomFeedUrl() {
+  const configured = (getSettings().roomJsonUrl || "").trim();
+  if (configured) {
+    return { url: configured, label: configured, isDemo: false };
+  }
+  const demo = demoRoomFeedUrl();
+  return { url: demo, label: "bundled example snapshot", isDemo: true };
+}
+function hideImgTooltip() {
+  if (!roomEls) return;
+  roomEls.imgTooltip.hidden = true;
+  roomEls.imgTooltipSrc.removeAttribute("src");
+}
+function showImgTooltip(src, clientX, clientY) {
+  if (!roomEls) return;
+  roomEls.imgTooltipSrc.src = src;
+  roomEls.imgTooltip.hidden = false;
+  const gap = 12;
+  const tw = 280;
+  const th = 220;
+  let left = clientX + gap;
+  let top = clientY + gap;
+  if (left + tw > window.innerWidth) left = clientX - tw - gap;
+  if (top + th > window.innerHeight) top = clientY - th - gap;
+  roomEls.imgTooltip.style.left = `${Math.max(4, left)}px`;
+  roomEls.imgTooltip.style.top = `${Math.max(4, top)}px`;
+}
+function renderRoomText(container, text, images) {
+  container.replaceChildren();
+  const parts = text.split(/(\[img\])/i);
+  let imgIdx = 0;
+  for (const part of parts) {
+    if (/^\[img\]$/i.test(part)) {
+      const src = images[imgIdx++];
+      const span = document.createElement("span");
+      span.className = "room-img-ref";
+      span.textContent = "[img]";
+      if (src) {
+        span.dataset.src = src;
+        span.title = "hover preview";
+        span.addEventListener("mouseenter", (ev) => {
+          showImgTooltip(src, ev.clientX, ev.clientY);
+        });
+        span.addEventListener("mousemove", (ev) => {
+          if (roomEls && !roomEls.imgTooltip.hidden) {
+            showImgTooltip(src, ev.clientX, ev.clientY);
+          }
+        });
+        span.addEventListener("mouseleave", hideImgTooltip);
+      }
+      container.appendChild(span);
+      container.appendChild(document.createTextNode(" "));
+      continue;
+    }
+    let last = 0;
+    const re = new RegExp(URL_IN_TEXT_RE.source, "gi");
+    let m;
+    while ((m = re.exec(part)) !== null) {
+      if (m.index > last) {
+        container.appendChild(document.createTextNode(part.slice(last, m.index)));
+      }
+      const href = m[1] || m[0] || "";
+      const a = document.createElement("a");
+      a.className = "room-link";
+      a.href = href;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = href;
+      container.appendChild(a);
+      last = m.index + m[0].length;
+    }
+    if (last < part.length) {
+      container.appendChild(document.createTextNode(part.slice(last)));
+    }
+  }
+  while (imgIdx < images.length) {
+    const src = images[imgIdx++];
+    if (!src) continue;
+    container.appendChild(document.createTextNode(" "));
+    const span = document.createElement("span");
+    span.className = "room-img-ref";
+    span.textContent = "[img]";
+    span.dataset.src = src;
+    span.title = "hover preview";
+    span.addEventListener(
+      "mouseenter",
+      (ev) => showImgTooltip(src, ev.clientX, ev.clientY)
+    );
+    span.addEventListener("mousemove", (ev) => {
+      if (roomEls && !roomEls.imgTooltip.hidden) {
+        showImgTooltip(src, ev.clientX, ev.clientY);
+      }
+    });
+    span.addEventListener("mouseleave", hideImgTooltip);
+    container.appendChild(span);
+  }
+}
+function normalizeRoomFeed(raw) {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("snapshot is not a JSON object");
+  }
+  const obj = raw;
+  const list = Array.isArray(obj.messages) ? obj.messages : [];
+  const messages = [];
+  for (let i = 0; i < list.length; i++) {
+    const row = list[i];
+    if (!row || typeof row !== "object") continue;
+    const m = row;
+    const user = String(m.user ?? m.author ?? m.name ?? "unknown").trim() || "unknown";
+    const time = String(m.time ?? m.date ?? m.timestamp ?? "").trim();
+    let text = String(m.text ?? m.body ?? m.message ?? "").trim();
+    const images = Array.isArray(m.images) ? m.images.map((x) => String(x)).filter(Boolean) : [];
+    if (!text && images.length === 0) continue;
+    if (!text && images.length) text = "[img]";
+    const id = String(m.id ?? `${user}-${time}-${i}`);
+    messages.push({ id, user, time, text, images });
+  }
+  return {
+    version: typeof obj.version === "number" ? obj.version : 1,
+    updatedAt: typeof obj.updatedAt === "string" ? obj.updatedAt : void 0,
+    source: typeof obj.source === "string" ? obj.source : void 0,
+    messages
+  };
+}
+function renderRoomFeed(feed, meta) {
+  if (!roomEls) return;
+  roomEls.roomLog.replaceChildren();
+  setRoomStatus(meta);
+  if (!feed.messages.length) {
+    const empty = document.createElement("p");
+    empty.className = "room-empty";
+    empty.textContent = "no messages in snapshot";
+    roomEls.roomLog.appendChild(empty);
+    return;
+  }
+  const stickToBottom = roomEls.roomLog.scrollHeight - roomEls.roomLog.scrollTop - roomEls.roomLog.clientHeight < 40;
+  for (const msg of feed.messages) {
+    const row = document.createElement("article");
+    row.className = "room-msg";
+    row.dataset.id = msg.id;
+    const head = document.createElement("div");
+    head.className = "room-msg-head";
+    const user = document.createElement("span");
+    user.className = "room-user";
+    user.textContent = msg.user;
+    head.appendChild(user);
+    if (msg.time) {
+      const time = document.createElement("span");
+      time.className = "room-time";
+      time.textContent = msg.time;
+      head.appendChild(time);
+    }
+    row.appendChild(head);
+    const body = document.createElement("div");
+    body.className = "room-text";
+    renderRoomText(body, msg.text, msg.images || []);
+    row.appendChild(body);
+    roomEls.roomLog.appendChild(row);
+  }
+  if (stickToBottom || roomEls.roomLog.dataset.initial !== "0") {
+    roomEls.roomLog.scrollTop = roomEls.roomLog.scrollHeight;
+    roomEls.roomLog.dataset.initial = "0";
+  }
+}
+function formatRoomUpdated(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso.slice(0, 16);
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return "";
+  }
+}
+async function refreshRoom(opts = {}) {
+  if (!roomEls) return;
+  const { url, label, isDemo } = resolveRoomFeedUrl();
+  if (!opts.force && url === lastRoomUrl && roomEls.roomLog.childElementCount > 0) {
+    return;
+  }
+  if (roomFetchInFlight) return;
+  roomFetchInFlight = true;
+  roomEls.roomBadge.textContent = "\u2026";
+  roomEls.roomBadge.classList.add("dim");
+  setRoomStatus(
+    isDemo ? "demo snapshot \xB7 loading\u2026" : `loading snapshot \xB7 ${label}\u2026`
+  );
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      credentials: "omit",
+      headers: { Accept: "application/json" }
+    });
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText || ""}`.trim());
+    }
+    const raw = await res.json();
+    const feed = normalizeRoomFeed(raw);
+    lastRoomUrl = url;
+    const when = formatRoomUpdated(feed.updatedAt);
+    const hostLabel = (() => {
+      if (isDemo) return "example";
+      try {
+        return new URL(url).host;
+      } catch {
+        return "snapshot";
+      }
+    })();
+    roomEls.roomBadge.textContent = String(feed.messages.length);
+    roomEls.roomBadge.classList.remove("dim");
+    const meta = [
+      hostLabel,
+      `${feed.messages.length} msgs`,
+      when,
+      feed.source ? feed.source.slice(0, 40) : "",
+      isDemo ? "demo" : "snapshot",
+      "\u21BB"
+    ].filter(Boolean).join(" \xB7 ");
+    renderRoomFeed(feed, meta);
+  } catch (err) {
+    console.warn("room snapshot failed", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    roomEls.roomBadge.textContent = "err";
+    roomEls.roomBadge.classList.add("dim");
+    roomEls.roomLog.replaceChildren();
+    roomEls.roomLog.dataset.initial = "1";
+    const p = document.createElement("p");
+    p.className = "room-empty";
+    p.textContent = isDemo ? `demo load failed \xB7 ${msg}` : `could not load snapshot \xB7 ${msg} \xB7 run scrape + serve, or check URL`;
+    roomEls.roomLog.appendChild(p);
+    setRoomStatus(isDemo ? `demo \xB7 error` : `error \xB7 ${label}`);
+  } finally {
+    roomFetchInFlight = false;
+  }
+}
+function getLastRoomUrl() {
+  return lastRoomUrl;
+}
+function fillRoomSettingsField() {
+  if (!roomEls) return;
+  roomEls.roomJsonUrl.value = getSettings().roomJsonUrl || "";
+}
+function readRoomSettingsField() {
+  if (!roomEls) return "";
+  return (roomEls.roomJsonUrl.value || "").trim();
+}
+function initRoomPane(els2) {
+  roomEls = els2;
+  roomEls.roomRefresh.addEventListener("click", () => {
+    void refreshRoom({ force: true });
+  });
+  void refreshRoom();
+}
+
+// src/features/weather/weather-pane.ts
+var WEATHER_REFRESH_MS = 15 * 60 * 1e3;
+var WEATHER_CACHE_MS = 10 * 60 * 1e3;
+var weatherCache = null;
+var weatherFetchInFlight = false;
+var lastWeatherZip = "";
 function normalizeZip(raw) {
   return String(raw || "").trim();
+}
+function getLastWeatherZip() {
+  return lastWeatherZip;
 }
 function windArrow(deg) {
   if (deg == null || Number.isNaN(Number(deg))) return "";
@@ -595,7 +937,7 @@ function renderWeather(payload) {
 }
 async function refreshWeather(opts = {}) {
   const force = opts.force ?? false;
-  const zip = normalizeZip(settings.zipCode);
+  const zip = normalizeZip(getSettings().zipCode);
   if (!zip) {
     showWeatherSetup("set zip code in settings");
     lastWeatherZip = "";
@@ -631,18 +973,41 @@ async function refreshWeather(opts = {}) {
     weatherFetchInFlight = false;
   }
 }
-function tick() {
-  updateClock();
-  updateAge();
+function initWeatherPane() {
+  void refreshWeather();
+  setInterval(() => {
+    void refreshWeather();
+  }, WEATHER_REFRESH_MS);
 }
+
+// src/ui/background.ts
+function applyBackground() {
+  const url = (getSettings().bgImage || "").trim();
+  if (url) {
+    els.bgLayer.classList.add("has-image");
+    document.body.classList.add("has-bg-image");
+    const safe = url.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    els.bgLayer.style.backgroundImage = `url("${safe}")`;
+  } else {
+    els.bgLayer.classList.remove("has-image");
+    document.body.classList.remove("has-bg-image");
+    els.bgLayer.style.backgroundImage = "";
+  }
+}
+
+// src/ui/settings-dialog.ts
 function fillForm() {
-  els.birthDate.value = settings.birthDate || "";
-  const t = settings.birthTime || "00:00:00";
+  const settings2 = getSettings();
+  els.birthDate.value = settings2.birthDate || "";
+  const t = settings2.birthTime || "00:00:00";
   els.birthTime.value = t.length >= 8 ? t.slice(0, 8) : t.slice(0, 5);
-  els.lifespan.value = String(settings.lifespan ?? 80);
-  els.showDeath.checked = Boolean(settings.showDeath);
-  els.zipCode.value = settings.zipCode || "";
-  els.bgImage.value = settings.bgImage || "";
+  els.lifespan.value = String(settings2.lifespan ?? 80);
+  els.showDeath.checked = Boolean(settings2.showDeath);
+  els.zipCode.value = settings2.zipCode || "";
+  els.bgImage.value = settings2.bgImage || "";
+  if (isFeatureEnabled("room")) {
+    fillRoomSettingsField();
+  }
 }
 function openSettings() {
   fillForm();
@@ -651,35 +1016,69 @@ function openSettings() {
 function closeSettings() {
   if (els.settingsDialog.open) els.settingsDialog.close();
 }
-els.settingsToggle.addEventListener("click", openSettings);
-els.settingsCancel.addEventListener("click", (e) => {
-  e.preventDefault();
-  closeSettings();
-});
-els.settingsForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const prevZip = normalizeZip(settings.zipCode);
-  await saveSettings({
-    birthDate: els.birthDate.value,
-    birthTime: els.birthTime.value || "00:00:00",
-    lifespan: Number(els.lifespan.value) || 80,
-    showDeath: els.showDeath.checked,
-    zipCode: normalizeZip(els.zipCode.value),
-    bgImage: (els.bgImage.value || "").trim()
+function initSettingsDialog() {
+  els.settingsToggle.addEventListener("click", openSettings);
+  els.settingsCancel.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeSettings();
   });
-  closeSettings();
-  tick();
-  const nextZip = normalizeZip(settings.zipCode);
-  await refreshWeather({ force: nextZip !== prevZip || nextZip !== lastWeatherZip });
-});
-await loadSettings();
-applyBackground();
-tick();
-await refreshWeather();
-setInterval(tick, 50);
-setInterval(() => {
-  void refreshWeather();
-}, WEATHER_REFRESH_MS);
-if (!settings.birthDate) {
-  setTimeout(openSettings, 350);
+  els.settingsForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const prev = getSettings();
+    const prevZip = normalizeZip(prev.zipCode);
+    const prevRoom = (prev.roomJsonUrl || "").trim();
+    await saveSettings({
+      birthDate: els.birthDate.value,
+      birthTime: els.birthTime.value || "00:00:00",
+      lifespan: Number(els.lifespan.value) || 80,
+      showDeath: els.showDeath.checked,
+      zipCode: normalizeZip(els.zipCode.value),
+      roomJsonUrl: isFeatureEnabled("room") ? readRoomSettingsField() : prev.roomJsonUrl,
+      bgImage: (els.bgImage.value || "").trim()
+    });
+    applyBackground();
+    closeSettings();
+    tickLife();
+    const next = getSettings();
+    const nextZip = normalizeZip(next.zipCode);
+    await refreshWeather({
+      force: nextZip !== prevZip || nextZip !== getLastWeatherZip()
+    });
+    if (isFeatureEnabled("room")) {
+      const nextRoom = (next.roomJsonUrl || "").trim();
+      await refreshRoom({
+        force: nextRoom !== prevRoom || nextRoom !== getLastRoomUrl()
+      });
+    }
+  });
 }
+
+// src/main.ts
+async function bootstrap() {
+  applyFeatureVisibility(FEATURES);
+  await loadSettings();
+  applyBackground();
+  initSettingsDialog();
+  initLifePane();
+  if (isFeatureEnabled("weather")) {
+    initWeatherPane();
+  }
+  if (isFeatureEnabled("room")) {
+    const roomEls2 = getRoomEls();
+    if (roomEls2) {
+      initRoomPane(roomEls2);
+    } else {
+      console.warn("[newtab] FEATURES.room on but room DOM missing");
+    }
+  } else {
+    console.info(
+      "[newtab] room feature flagged off (login/scrape TBD) \u2014 enable in src/config/features.ts"
+    );
+  }
+  if (!getSettings().birthDate) {
+    setTimeout(openSettings, 350);
+  }
+}
+void bootstrap().catch((err) => {
+  console.error("[newtab] bootstrap failed", err);
+});
