@@ -42,6 +42,7 @@ Same settings dialog for first-run and later edits:
 | Field | Notes |
 |-------|--------|
 | Birth date / time | Required for life ring |
+| **Zip code** | Drives weather pane (US ZIP preferred; free Open-Meteo + zippopotam) |
 | Expected lifespan | Ring segments + optional death countdown |
 | Show death countdown | Toggle |
 | **Forum feed URL** | User-supplied; **do not hardcode or document a specific site in the repo**. Operator knows which URL to paste. |
@@ -49,10 +50,13 @@ Same settings dialog for first-run and later edits:
 
 ## Planned widgets (fill in details later)
 
-### Weather
+### Weather (live TUI)
 
-- Widget on the new tab showing local weather
-- Details TBD (provider, location source, units, refresh)
+- Compact TUI pane driven by **zip code** in settings (same dialog as birthday)
+- **Open-Meteo** forecast (no API key) + zippopotam / geocoding for lat-lon
+- Hero: sky glyph + large temp + place; chips for humidity, wind, UV, sunrise/sunset
+- **Next 12 hours**: temp, wind, and UV — each with colored values and a bar chart directly under that metric (no separate t/w sparkline block)
+- Refresh ~15 min; cache ~10 min; host permissions for Open-Meteo / zippopotam
 
 ### Spotify / Now Playing
 

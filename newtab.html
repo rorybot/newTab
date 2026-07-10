@@ -75,18 +75,89 @@
         </article>
 
         <!-- Weather -->
-        <article class="pane pane-sm" id="weather-pane">
+        <article class="pane pane-weather" id="weather-pane">
           <header class="pane-titlebar">
             <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
             <span class="pane-name">weather</span>
-            <span class="pane-badge dim">stub</span>
+            <span class="pane-badge dim" id="weather-badge">…</span>
           </header>
-          <div class="pane-body">
-            <pre class="tui-stub" aria-hidden="true">┌ local ─────────┐
-│ ░░ waiting ░░  │
-│  · · · · · ·   │
-└────────────────┘</pre>
-            <p class="pane-placeholder">Local weather — coming soon</p>
+          <div class="pane-body weather-body">
+            <div id="weather-setup" class="weather-setup mono">
+              <p class="muted">set zip code in settings</p>
+              <p class="muted">temp · humidity · wind · sun · 12h</p>
+            </div>
+            <div id="weather-live" class="weather-live mono" hidden>
+              <!-- Hero: current conditions -->
+              <div class="wx-hero">
+                <span id="wx-sky" class="wx-sky" aria-hidden="true">·</span>
+                <div class="wx-hero-main">
+                  <span id="wx-temp" class="wx-temp">—</span>
+                  <span id="wx-place" class="wx-place muted"></span>
+                </div>
+              </div>
+
+              <div class="wx-now-meta">
+                <span class="wx-chip wx-chip-hum" title="Humidity">
+                  <span class="wx-ico">≈</span> H <span id="wx-humidity">—</span>%
+                  <span id="wx-hum-bar" class="wx-ascii-meter" aria-hidden="true"></span>
+                </span>
+                <span class="wx-chip wx-chip-wind" title="Wind">
+                  <span id="wx-wind-ico" class="wx-ico">≈</span>
+                  W <span id="wx-wind">—</span>
+                </span>
+                <span class="wx-chip wx-chip-uv" title="UV index">
+                  <span class="wx-ico">◈</span> UV <span id="wx-uv">—</span>
+                </span>
+                <span class="wx-chip wx-chip-rise" title="Sunrise">
+                  <span class="wx-ico">☀</span> ↑ <span id="wx-sunrise">—</span>
+                </span>
+                <span class="wx-chip wx-chip-set" title="Sunset">
+                  <span class="wx-ico">☾</span> ↓ <span id="wx-sunset">—</span>
+                </span>
+              </div>
+
+              <!-- 12h forecast: each metric owns its values + chart -->
+              <div class="wx-forecast" aria-label="Next 12 hours">
+                <div class="wx-row wx-hours-row">
+                  <span class="wx-label muted">hr</span>
+                  <div id="wx-hours" class="wx-cells"></div>
+                </div>
+
+                <section class="wx-metric" aria-label="Temperature forecast">
+                  <div class="wx-row">
+                    <span class="wx-label muted">°F</span>
+                    <div id="wx-temps" class="wx-cells"></div>
+                  </div>
+                  <div class="wx-row wx-chart-row">
+                    <span class="wx-label muted" aria-hidden="true"></span>
+                    <div id="wx-bars" class="wx-chart" aria-hidden="true"></div>
+                  </div>
+                </section>
+
+                <section class="wx-metric" aria-label="Wind forecast">
+                  <div class="wx-row">
+                    <span class="wx-label muted">mph</span>
+                    <div id="wx-winds" class="wx-cells"></div>
+                  </div>
+                  <div class="wx-row wx-chart-row">
+                    <span class="wx-label muted" aria-hidden="true"></span>
+                    <div id="wx-wind-bars" class="wx-chart wx-chart-wind" aria-hidden="true"></div>
+                  </div>
+                </section>
+
+                <section class="wx-metric" aria-label="UV index forecast">
+                  <div class="wx-row">
+                    <span class="wx-label muted">uv</span>
+                    <div id="wx-uvs" class="wx-cells"></div>
+                  </div>
+                  <div class="wx-row wx-chart-row">
+                    <span class="wx-label muted" aria-hidden="true"></span>
+                    <div id="wx-uv-bars" class="wx-chart wx-chart-uv" aria-hidden="true"></div>
+                  </div>
+                </section>
+              </div>
+              <p id="wx-error" class="wx-error" hidden></p>
+            </div>
           </div>
         </article>
 
@@ -188,6 +259,21 @@
           <span>Birth time (optional)</span>
           <input type="time" id="birth-time" name="birthTime" step="1" />
         </label>
+
+        <label class="field">
+          <span>Zip code</span>
+          <input
+            type="text"
+            id="zip-code"
+            name="zipCode"
+            inputmode="numeric"
+            placeholder="e.g. 80202"
+            autocomplete="postal-code"
+            maxlength="12"
+            spellcheck="false"
+          />
+        </label>
+        <p class="field-hint">Powers the weather pane (US ZIP works best; free Open-Meteo data).</p>
 
         <label class="field">
           <span>Expected lifespan (years)</span>
