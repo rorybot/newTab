@@ -18,3 +18,7 @@ backend/out/
 backend/**/__pycache__/
 *.pyc
 
+.aider*
+
+# Local Claude Code project context (auto-loaded per session, not shared)
+CLAUDE.md
