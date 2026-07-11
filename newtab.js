@@ -10,7 +10,11 @@ var FEATURES = {
    * Room snapshot JSON (recent shouts).
    * Disabled: needs login-aware scrape on the backend first.
    */
-  room: false
+  room: false,
+  /** Etymology / Root of the Day (mock TUI) */
+  etymology: true,
+  /** Anglish Germanic alternatives (mock TUI) */
+  anglish: true
 };
 function isFeatureEnabled(name) {
   return FEATURES[name] === true;
@@ -1912,6 +1916,127 @@ function initWeatherPane() {
   });
 }
 
+// src/features/etymology/etymology-pane.ts
+var ROOTS = [
+  {
+    word: "husband",
+    senses: "n. & v.",
+    earliest: "c. 1290",
+    oe: "h\u016Bsb\u014Dnda 'house-master' (rare)",
+    on: "h\xFAsb\xF3ndi 'house-master, husband' (h\xFAs + b\xF3ndi 'dweller, farmer')",
+    composition: "h\xFAs 'house' + b\xF3ndi 'freeholder, farmer'",
+    pie: "*b\u02B0uH- 'to be, dwell' + *d\u02B0eh\u2081- 'to put, place'",
+    note: "The modern 'spouse' sense narrowed in Middle English; the verb 'to husband' (manage thriftily) is 16c."
+  },
+  {
+    word: "window",
+    senses: "n.",
+    earliest: "c. 1225",
+    oe: "(no direct cognate; window concept expressed with \u0113ag\xFEyrel 'eye-hole')",
+    on: "vindauga 'wind-eye' (vindr + auga)",
+    composition: "vindr 'wind' + auga 'eye' \u2014 a literal hole to let the wind in",
+    pie: "*h\u2082weh\u2081- 'to blow' + *h\u2083ek\u02B7- 'to see'",
+    note: "Replaced OE \u0113ag\xFEyrel; the 'eye' metaphor survives in many Germanic languages."
+  },
+  {
+    word: "ghost",
+    senses: "n.",
+    earliest: "OE (Beowulf c. 725)",
+    oe: "g\u0101st 'soul, spirit, breath'",
+    on: "(cognate) andi 'spirit' (modern Scandinavian forms)",
+    composition: "from PIE root for 'to blow, breathe' \u2014 the soul as breath",
+    pie: "*g\u02B0eh\u2081- 'to gape, yawn' or *g\u02B0ews- 'to breathe' (disputed)",
+    note: "The gh- spelling is a 16c. affectation; cognate with Ger. Geist and the -geist in Zeitgeist."
+  }
+];
+var current = null;
+function pickRandom() {
+  return ROOTS[Math.floor(Math.random() * ROOTS.length)];
+}
+function render() {
+  if (!current) current = pickRandom();
+  const w = document.getElementById("etym-word");
+  const senses = document.getElementById("etym-senses");
+  const earliest = document.getElementById("etym-earliest");
+  const oe = document.getElementById("etym-oe");
+  const on = document.getElementById("etym-on");
+  const comp = document.getElementById("etym-comp");
+  const pie = document.getElementById("etym-pie");
+  const n = document.getElementById("etym-note");
+  const timeline = document.getElementById("etym-timeline");
+  if (w) w.textContent = current.word;
+  if (senses) senses.textContent = current.senses;
+  if (earliest) earliest.textContent = current.earliest;
+  if (oe) oe.textContent = current.oe;
+  if (on) on.textContent = current.on;
+  if (comp) comp.textContent = current.composition;
+  if (pie) pie.textContent = current.pie;
+  if (n) n.textContent = current.note;
+  if (timeline) {
+    timeline.innerHTML = `
+      <span class="layer">ON</span>
+      <span class="arrow">\u2192</span>
+      <span class="layer">OE/ME</span>
+      <span class="arrow">\u2192</span>
+      <span class="layer">ModE</span>
+      <span class="arrow">\u2192</span>
+      <span class="layer pie">PIE</span>
+    `;
+  }
+}
+function initEtymologyPane() {
+  render();
+  const pane = document.getElementById("etymology-pane");
+  if (pane) {
+    pane.addEventListener("click", () => {
+      current = pickRandom();
+      render();
+    });
+  }
+}
+
+// src/features/anglish/anglish-pane.ts
+var ENTRIES = [
+  {
+    modern: "television",
+    anglish: "far-seer",
+    note: "OE feorr + s\u0113on; calque of Greek tele- + vision"
+  },
+  {
+    modern: "information",
+    anglish: "in-form-ing",
+    note: "or \u2018tidings\u2019 (still alive in \u2018good tidings\u2019)"
+  },
+  {
+    modern: "education",
+    anglish: "up-bringing",
+    note: "or \u2018learning\u2019 \u2014 the Latin root educare = \u2018lead out\u2019"
+  }
+];
+var current2 = null;
+function pickRandom2() {
+  return ENTRIES[Math.floor(Math.random() * ENTRIES.length)];
+}
+function render2() {
+  if (!current2) current2 = pickRandom2();
+  const m = document.getElementById("ang-word");
+  const a = document.getElementById("ang-alt");
+  const n = document.getElementById("ang-note");
+  if (m) m.textContent = current2.modern;
+  if (a) a.textContent = current2.anglish;
+  if (n) n.textContent = current2.note;
+}
+function initAnglishPane() {
+  render2();
+  const pane = document.getElementById("anglish-pane");
+  if (pane) {
+    pane.addEventListener("click", () => {
+      current2 = pickRandom2();
+      render2();
+    });
+  }
+}
+
 // src/ui/background.ts
 function applyBackground() {
   const url = (getSettings().bgImage || "").trim();
@@ -2040,6 +2165,20 @@ async function bootstrap() {
   } else {
     console.info(
       "[newtab] room feature flagged off (login/scrape TBD) \u2014 enable in src/config/features.ts"
+    );
+  }
+  if (isFeatureEnabled("etymology")) {
+    initEtymologyPane();
+  } else {
+    console.info(
+      "[newtab] etymology feature flagged off \u2014 enable in src/config/features.ts"
+    );
+  }
+  if (isFeatureEnabled("anglish")) {
+    initAnglishPane();
+  } else {
+    console.info(
+      "[newtab] anglish feature flagged off \u2014 enable in src/config/features.ts"
     );
   }
   if (!getSettings().birthDate) {

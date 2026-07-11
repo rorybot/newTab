@@ -74,7 +74,7 @@ First launch opens settings so you can set birth date, zip, etc.
 | `src/features/life/` | Life ring + age clock |
 | `src/features/weather/` | Weather TUI |
 | `src/features/room/` | Room snapshot (flagged off; login scrape TBD) |
-| *(planned)* `src/features/etymology/` | Root of the Day – etymology.com word + TUI visual |
+| *(planned)* `src/features/etymology/` | Root of the Day – etymonline.com word + TUI visual |
 | *(planned)* `src/features/anglish/` | Anglish – Germanic alternatives for loanwords |
 | `src/settings/` | Settings types + chrome.storage store |
 | `src/ui/` | DOM refs, settings dialog, background |

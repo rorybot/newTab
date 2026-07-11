@@ -79,7 +79,7 @@ Same settings dialog for first-run and later edits:
 
 ### Etymology — Root of the Day (planned)
 
-- Pull a random word (or interesting root) from **etymology.com** (public scrape or lightweight API if one appears).
+- Pull a random word (or interesting root) from **etymonline.com** (public scrape or lightweight API if one appears).
 - Display etymology / word origin in a compact **mock-TUI** visual — same family as the weather / HN panes (monospace, titlebar, chips, subtle art).
 - Goal: “Root of the Day” rather than classic Word of the Day; focus on interesting etymological stories or shared roots.
 - Keep everything lightweight and offline-cacheable; no heavy frontend work.

@@ -1595,6 +1595,70 @@ body.nt-hidden .wx-spf-warn.hot {
   color: var(--danger);
 }
 
+/* ── Etymology pane ── */
+.etymology-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding-top: 0.3rem;
+  font-size: 0.72rem;
+}
+
+.etym-head {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.etym-head strong {
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.etym-timeline {
+  display: flex;
+  gap: 0.25rem;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin: 0.2rem 0;
+}
+
+.etym-timeline .layer {
+  background: var(--accent-dim, rgba(196, 165, 116, 0.15));
+  padding: 0 0.35rem;
+  border-radius: 2px;
+}
+
+.etym-timeline .arrow {
+  color: var(--accent);
+}
+
+.etym-timeline .pie {
+  background: var(--accent);
+  color: #1a1410;
+  font-weight: 600;
+}
+
+.etym-details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.5rem;
+  font-size: 0.68rem;
+}
+
+.etym-details .label {
+  color: var(--text-muted);
+  min-width: 3.2rem;
+  text-align: right;
+}
+
+.etym-note {
+  margin: 0.15rem 0 0;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
 @media (min-width: 1100px) {
   #spotify-pane {
     min-width: 11rem;

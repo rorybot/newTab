@@ -9,6 +9,8 @@ import { initLifePane } from "./features/life/life-pane.js";
 import { initRoomPane } from "./features/room/room-pane.js";
 import { initSpotifyPane } from "./features/spotify/spotify-pane.js";
 import { initWeatherPane } from "./features/weather/weather-pane.js";
+import { initEtymologyPane } from "./features/etymology/etymology-pane.js";
+import { initAnglishPane } from "./features/anglish/anglish-pane.js";
 import { applyFeatureVisibility } from "./lib/dom.js";
 import { getSettings, loadSettings } from "./settings/store.js";
 import { applyBackground } from "./ui/background.js";
@@ -47,6 +49,22 @@ async function bootstrap(): Promise<void> {
   } else {
     console.info(
       "[newtab] room feature flagged off (login/scrape TBD) — enable in src/config/features.ts",
+    );
+  }
+
+  if (isFeatureEnabled("etymology")) {
+    initEtymologyPane();
+  } else {
+    console.info(
+      "[newtab] etymology feature flagged off — enable in src/config/features.ts",
+    );
+  }
+
+  if (isFeatureEnabled("anglish")) {
+    initAnglishPane();
+  } else {
+    console.info(
+      "[newtab] anglish feature flagged off — enable in src/config/features.ts",
     );
   }
 

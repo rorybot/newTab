@@ -16,6 +16,10 @@ export const FEATURES = {
    * Disabled: needs login-aware scrape on the backend first.
    */
   room: false,
+  /** Etymology / Root of the Day (mock TUI) */
+  etymology: true,
+  /** Anglish Germanic alternatives (mock TUI) */
+  anglish: true,
 } as const;
 
 export type FeatureName = keyof typeof FEATURES;
