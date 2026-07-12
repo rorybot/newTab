@@ -1,9 +1,14 @@
 /**
  * Anglish pane — Germanic alternatives (mock TUI).
  *
- * Demo list only. Real implementation would map common Romance/Latin
- * loanwords to their historical or constructed Germanic counterparts.
+ * Bundled with a 9k-word dataset built by backend/build_feeds.py, scraped
+ * from the Anglish Moot Wordbook + the Hurlebatte wordbook. Also tries the
+ * live backend snapshot feed, which — once a server is actually running it —
+ * overrides the bundled copy with a fresher one.
  */
+
+import { loadFeed } from "../../lib/feeds.js";
+import ANGLISH_DATA from "./anglish-data.json" with { type: "json" };
 
 interface AnglishEntry {
   modern: string;
@@ -11,28 +16,11 @@ interface AnglishEntry {
   note: string;
 }
 
-const ENTRIES: AnglishEntry[] = [
-  {
-    modern: "television",
-    anglish: "far-seer",
-    note: "OE feorr + sēon; calque of Greek tele- + vision",
-  },
-  {
-    modern: "information",
-    anglish: "in-form-ing",
-    note: "or ‘tidings’ (still alive in ‘good tidings’)",
-  },
-  {
-    modern: "education",
-    anglish: "up-bringing",
-    note: "or ‘learning’ — the Latin root educare = ‘lead out’",
-  },
-];
-
+let entries: AnglishEntry[] = ANGLISH_DATA as AnglishEntry[];
 let current: AnglishEntry | null = null;
 
 function pickRandom(): AnglishEntry {
-  return ENTRIES[Math.floor(Math.random() * ENTRIES.length)];
+  return entries[Math.floor(Math.random() * entries.length)]!;
 }
 
 function render(): void {
@@ -44,7 +32,7 @@ function render(): void {
 
   if (m) m.textContent = current.modern;
   if (a) a.textContent = current.anglish;
-  if (n) n.textContent = current.note;
+  if (n) n.textContent = current.note || "—";
 }
 
 export function initAnglishPane(): void {
@@ -56,4 +44,11 @@ export function initAnglishPane(): void {
       render();
     });
   }
+
+  void loadFeed<AnglishEntry>("anglish").then((feed) => {
+    if (!feed) return;
+    entries = feed.entries;
+    current = pickRandom();
+    render();
+  });
 }
