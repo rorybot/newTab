@@ -7,6 +7,7 @@ export const els = {
   ageLabel: requireEl<HTMLElement>("age-label"),
   deathCountdown: requireEl<HTMLElement>("death-countdown"),
   lifeSegments: requireEl<HTMLElement>("life-segments"),
+  lifeBlocks: requireEl<HTMLElement>("life-blocks"),
   lifeBadge: requireEl<HTMLElement>("life-badge"),
   lifePane: requireEl<HTMLElement>("life-pane"),
   ringProgress: requireEl<SVGCircleElement>("ring-progress"),

@@ -375,17 +375,100 @@ body.has-bg-image .bg-scrim {
 /* ── Life ring pane ── */
 
 .life-body {
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   gap: 0.75rem;
   padding: 0.85rem 1rem 1rem;
-  width: fit-content;
+}
+
+.life-main {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  width: 100%;
 }
 
 .life-ring-wrap {
   position: relative;
-  width: min(240px, 70vw);
+  width: min(220px, 70vw);
   aspect-ratio: 1;
+  flex-shrink: 0;
+}
+
+/* ── Life block meters — fills the space beside the ring ── */
+
+.life-blocks {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3rem;
+  flex: 1 1 auto;
+  min-width: 8rem;
+}
+
+.life-block {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}
+
+.life-block-range {
+  flex: 0 0 3.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.life-block-meter {
+  position: relative;
+  flex: 1 1 auto;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--ring-track);
+  overflow: hidden;
+}
+
+.life-block-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--ring-tick);
+  transition: width 0.4s ease;
+}
+
+.life-block-hint {
+  display: none;
+  flex: 1 1 auto;
+  font-size: 0.64rem;
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+
+.life-block.is-current {
+  color: var(--text);
+}
+
+.life-block.is-current .life-block-fill {
+  background: var(--accent);
+}
+
+.life-block.is-done {
+  opacity: 0.7;
+}
+
+.life-block.is-done .life-block-fill {
+  background: var(--ring-lived);
+}
+
+.life-block.is-future .life-block-meter {
+  display: none;
+}
+
+.life-block.is-future .life-block-hint {
+  display: inline-block;
 }
 
 .life-ring {

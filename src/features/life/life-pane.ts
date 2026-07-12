@@ -7,6 +7,32 @@ const RING_R = 82;
 const RING_CX = 100;
 const RING_CY = 100;
 
+/** Upper bound (inclusive) of each life block, in whole years. Anything past the last bound falls into a final open-ended "rest of life" block. */
+const LIFE_BLOCK_BOUNDS = [10, 13, 18, 28, 39, 49, 65, 75];
+
+interface LifeBlock {
+  start: number;
+  end: number;
+  label: string;
+}
+
+function buildLifeBlocks(lifespan: number): LifeBlock[] {
+  const blocks: LifeBlock[] = [];
+  let start = 0;
+  for (const end of LIFE_BLOCK_BOUNDS) {
+    blocks.push({ start, end, label: `${start}–${end}` });
+    start = end + 1;
+  }
+  const finalEnd = Math.max(start, Math.ceil(lifespan));
+  blocks.push({ start, end: finalEnd, label: `${start}+` });
+  return blocks;
+}
+
+function getLifeBlock(wholeYears: number, lifespan: number): LifeBlock {
+  const blocks = buildLifeBlocks(lifespan);
+  return blocks.find((b) => wholeYears <= b.end) ?? blocks[blocks.length - 1]!;
+}
+
 /**
  * Life pane used to tick every 50ms (20 Hz), rewriting the clock, age digits,
  * ring SVG, and death countdown on every tick. That alone can pin a few % CPU
@@ -33,6 +59,9 @@ let lastDeathText = "";
 let lastDeathHidden: boolean | null = null;
 let lastRingKey = "";
 let lastNeedsSetup: boolean | null = null;
+
+let blocksBuiltForLifespan: number | null = null;
+let blockRows: Array<{ row: HTMLElement; fill: HTMLElement; hint: HTMLElement }> = [];
 
 function setTextIfChanged(el: HTMLElement, next: string, prev: string): string {
   if (next === prev) return prev;
@@ -78,6 +107,60 @@ function ensureRingTicks(lifespanYears: number): void {
   }
 
   els.ringTicks.replaceChildren(frag);
+}
+
+/** (Re)build one row per life block. Only runs when the lifespan setting changes. */
+function ensureLifeBlockRows(lifespan: number): void {
+  if (blocksBuiltForLifespan === lifespan) return;
+  blocksBuiltForLifespan = lifespan;
+
+  const frag = document.createDocumentFragment();
+  blockRows = [];
+  for (const block of buildLifeBlocks(lifespan)) {
+    const row = document.createElement("div");
+    row.className = "life-block";
+
+    const range = document.createElement("span");
+    range.className = "life-block-range";
+    range.textContent = block.label;
+
+    const meter = document.createElement("span");
+    meter.className = "life-block-meter";
+    const fill = document.createElement("span");
+    fill.className = "life-block-fill";
+    meter.appendChild(fill);
+
+    const hint = document.createElement("span");
+    hint.className = "life-block-hint";
+
+    row.append(range, meter, hint);
+    frag.appendChild(row);
+    blockRows.push({ row, fill, hint });
+  }
+  els.lifeBlocks.replaceChildren(frag);
+}
+
+/** Fill state for every block row: solid for lived blocks, filling for the current one, a countdown hint for the rest. */
+function updateLifeBlocks(years: number, lifespan: number): void {
+  ensureLifeBlockRows(lifespan);
+  const blocks = buildLifeBlocks(lifespan);
+
+  blocks.forEach((block, i) => {
+    const { row, fill, hint } = blockRows[i]!;
+    const span = Math.max(1, block.end + 1 - block.start);
+    if (years >= block.end + 1) {
+      row.className = "life-block is-done";
+      fill.style.width = "100%";
+    } else if (years >= block.start) {
+      row.className = "life-block is-current";
+      const pct = Math.min(100, Math.max(0, ((years - block.start) / span) * 100));
+      fill.style.width = `${pct.toFixed(1)}%`;
+    } else {
+      row.className = "life-block is-future";
+      const yearsUntil = Math.max(1, Math.round(block.start - years));
+      hint.textContent = `in ${yearsUntil}y`;
+    }
+  });
 }
 
 function updateRing(livedFraction: number): void {
@@ -128,7 +211,11 @@ export function updateAge(opts: { full?: boolean } = {}): void {
       lastSegments,
     );
     lastBadge = setTextIfChanged(els.lifeBadge, "setup", lastBadge);
-    if (full) updateRing(0);
+    if (full) {
+      updateRing(0);
+      els.lifeBlocks.replaceChildren();
+      blocksBuiltForLifespan = null;
+    }
     return;
   }
 
@@ -155,14 +242,13 @@ export function updateAge(opts: { full?: boolean } = {}): void {
   updateRing(fraction);
 
   const wholeYears = Math.floor(years);
-  const decade = Math.floor(years / 10) * 10;
-  const yearInDecade = wholeYears - decade;
+  const block = getLifeBlock(wholeYears, lifespan);
   lastSegments = setTextIfChanged(
     els.lifeSegments,
-    `segment ${wholeYears + 1}/${lifespan} · decade ${decade}–${decade + 9} · +${yearInDecade}y in block · ` +
-      `${Math.max(0, lifespan - years).toFixed(2)}y est. left`,
+    `block ${block.label} · +${wholeYears - block.start}y in block`,
     lastSegments,
   );
+  updateLifeBlocks(years, lifespan);
 
   if (settings.showDeath) {
     const death = expectedDeathDate(birth, lifespan);

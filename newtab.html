@@ -35,37 +35,41 @@
             <span class="pane-badge" id="life-badge">—</span>
           </header>
           <div class="pane-body life-body">
-            <div class="life-ring-wrap">
-              <svg class="life-ring" viewBox="0 0 200 200" role="img" aria-labelledby="life-ring-label">
-                <title id="life-ring-label">Life progress ring</title>
-                <!-- background track -->
-                <circle class="ring-track" cx="100" cy="100" r="82" />
-                <!-- decade tick marks (drawn by JS into this group) -->
-                <g id="ring-ticks" class="ring-ticks"></g>
-                <!-- lived arc -->
-                <circle
-                  id="ring-progress"
-                  class="ring-progress"
-                  cx="100"
-                  cy="100"
-                  r="82"
-                  pathLength="100"
-                />
-                <!-- remaining arc hint (faint) -->
-                <circle
-                  id="ring-remaining"
-                  class="ring-remaining"
-                  cx="100"
-                  cy="100"
-                  r="82"
-                  pathLength="100"
-                />
-              </svg>
-              <div class="life-center">
-                <p class="life-eyebrow">you are</p>
-                <p id="age-display" class="age-display">—</p>
-                <p id="age-label" class="age-label">years old</p>
+            <div class="life-main">
+              <div class="life-ring-wrap">
+                <svg class="life-ring" viewBox="0 0 200 200" role="img" aria-labelledby="life-ring-label">
+                  <title id="life-ring-label">Life progress ring</title>
+                  <!-- background track -->
+                  <circle class="ring-track" cx="100" cy="100" r="82" />
+                  <!-- decade tick marks (drawn by JS into this group) -->
+                  <g id="ring-ticks" class="ring-ticks"></g>
+                  <!-- lived arc -->
+                  <circle
+                    id="ring-progress"
+                    class="ring-progress"
+                    cx="100"
+                    cy="100"
+                    r="82"
+                    pathLength="100"
+                  />
+                  <!-- remaining arc hint (faint) -->
+                  <circle
+                    id="ring-remaining"
+                    class="ring-remaining"
+                    cx="100"
+                    cy="100"
+                    r="82"
+                    pathLength="100"
+                  />
+                </svg>
+                <div class="life-center">
+                  <p class="life-eyebrow">you are</p>
+                  <p id="age-display" class="age-display">—</p>
+                  <p id="age-label" class="age-label">years old</p>
+                </div>
               </div>
+              <!-- life block meters (filled by JS) -->
+              <div id="life-blocks" class="life-blocks mono"></div>
             </div>
             <div class="life-meta">
               <p id="life-segments" class="life-segments mono"></p>
