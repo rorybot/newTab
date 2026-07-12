@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "New Tab",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Personal new tab — mortality clock, weather, Spotify, and whatever else I want.",
   "chrome_url_overrides": {
     "newtab": "newtab.html"
@@ -14,6 +14,7 @@
     "https://api.open-meteo.com/*",
     "https://geocoding-api.open-meteo.com/*",
     "https://api.zippopotam.us/*",
+    "https://hacker-news.firebaseio.com/*",
     "https://accounts.spotify.com/*",
     "https://api.spotify.com/*",
     "http://127.0.0.1/*",

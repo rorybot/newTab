@@ -16,6 +16,8 @@ export const FEATURES = {
    * Disabled: needs login-aware scrape on the backend first.
    */
   room: false,
+  /** Hacker News TUI story table (feed-first, live Firebase fallback). */
+  hn: true,
   /** Etymology / Root of the Day (mock TUI) */
   etymology: true,
   /** Anglish Germanic alternatives (mock TUI) */

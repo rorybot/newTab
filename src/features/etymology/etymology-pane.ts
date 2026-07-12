@@ -1,9 +1,15 @@
 /**
  * Etymology pane — Root of the Day (mock TUI).
  *
- * Uses a tiny hardcoded list (demo). When a real data source is wired,
- * replace the array with a fetch from etymonline.com or a snapshot JSON.
+ * Bundled with a 10k-word dataset built by backend/build_feeds.py from the
+ * yosevu/etymonline dump (see that script for how OE/ON/PIE fields are
+ * extracted). Also tries the live backend snapshot feed, which — once a
+ * server is actually running it — overrides the bundled copy with a fresher
+ * one; the bundled copy is what actually renders day to day.
  */
+
+import { loadFeed } from "../../lib/feeds.js";
+import ETYMOLOGY_DATA from "./etymology-data.json" with { type: "json" };
 
 interface RootEntry {
   word: string;
@@ -16,43 +22,11 @@ interface RootEntry {
   note: string;             // extra commentary
 }
 
-const ROOTS: RootEntry[] = [
-  {
-    word: "husband",
-    senses: "n. & v.",
-    earliest: "c. 1290",
-    oe: "hūsbōnda 'house-master' (rare)",
-    on: "húsbóndi 'house-master, husband' (hús + bóndi 'dweller, farmer')",
-    composition: "hús 'house' + bóndi 'freeholder, farmer'",
-    pie: "*bʰuH- 'to be, dwell' + *dʰeh₁- 'to put, place'",
-    note: "The modern 'spouse' sense narrowed in Middle English; the verb 'to husband' (manage thriftily) is 16c.",
-  },
-  {
-    word: "window",
-    senses: "n.",
-    earliest: "c. 1225",
-    oe: "(no direct cognate; window concept expressed with ēagþyrel 'eye-hole')",
-    on: "vindauga 'wind-eye' (vindr + auga)",
-    composition: "vindr 'wind' + auga 'eye' — a literal hole to let the wind in",
-    pie: "*h₂weh₁- 'to blow' + *h₃ekʷ- 'to see'",
-    note: "Replaced OE ēagþyrel; the 'eye' metaphor survives in many Germanic languages.",
-  },
-  {
-    word: "ghost",
-    senses: "n.",
-    earliest: "OE (Beowulf c. 725)",
-    oe: "gāst 'soul, spirit, breath'",
-    on: "(cognate) andi 'spirit' (modern Scandinavian forms)",
-    composition: "from PIE root for 'to blow, breathe' — the soul as breath",
-    pie: "*gʰeh₁- 'to gape, yawn' or *gʰews- 'to breathe' (disputed)",
-    note: "The gh- spelling is a 16c. affectation; cognate with Ger. Geist and the -geist in Zeitgeist.",
-  },
-];
-
+let entries: RootEntry[] = ETYMOLOGY_DATA as RootEntry[];
 let current: RootEntry | null = null;
 
 function pickRandom(): RootEntry {
-  return ROOTS[Math.floor(Math.random() * ROOTS.length)];
+  return entries[Math.floor(Math.random() * entries.length)]!;
 }
 
 function render(): void {
@@ -69,13 +43,13 @@ function render(): void {
   const timeline = document.getElementById("etym-timeline");
 
   if (w) w.textContent = current.word;
-  if (senses) senses.textContent = current.senses;
-  if (earliest) earliest.textContent = current.earliest;
-  if (oe) oe.textContent = current.oe;
-  if (on) on.textContent = current.on;
-  if (comp) comp.textContent = current.composition;
-  if (pie) pie.textContent = current.pie;
-  if (n) n.textContent = current.note;
+  if (senses) senses.textContent = current.senses || "—";
+  if (earliest) earliest.textContent = current.earliest || "—";
+  if (oe) oe.textContent = current.oe || "—";
+  if (on) on.textContent = current.on || "—";
+  if (comp) comp.textContent = current.composition || "—";
+  if (pie) pie.textContent = current.pie || "—";
+  if (n) n.textContent = current.note || "—";
 
   // Visual timeline: ON → OE/ME → ModE (very compact TUI style)
   if (timeline) {
@@ -102,4 +76,11 @@ export function initEtymologyPane(): void {
       render();
     });
   }
+
+  void loadFeed<RootEntry>("etymology").then((feed) => {
+    if (!feed) return;
+    entries = feed.entries;
+    current = pickRandom();
+    render();
+  });
 }
