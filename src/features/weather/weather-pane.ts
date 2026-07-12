@@ -4,6 +4,8 @@ import { els } from "../../ui/refs.js";
 
 const WEATHER_REFRESH_MS = 15 * 60 * 1000;
 const WEATHER_CACHE_MS = 10 * 60 * 1000;
+/** Cache survives page loads so a new tab paints instantly instead of re-fetching. */
+const WEATHER_CACHE_STORAGE_KEY = "newTabWeatherCache";
 
 interface GeoResult {
   lat: number;
@@ -137,6 +139,26 @@ interface OpenMeteoGeoResponse {
 
 let weatherCache: WeatherCacheEntry | null = null;
 let weatherFetchInFlight = false;
+
+function hydrateWeatherCache(): void {
+  if (weatherCache) return;
+  try {
+    const raw = localStorage.getItem(WEATHER_CACHE_STORAGE_KEY);
+    if (!raw) return;
+    const entry = JSON.parse(raw) as WeatherCacheEntry;
+    if (entry?.zip && entry.home && entry.extras) weatherCache = entry;
+  } catch {
+    // corrupt cache — ignore; next successful fetch rewrites it
+  }
+}
+
+function persistWeatherCache(entry: WeatherCacheEntry): void {
+  try {
+    localStorage.setItem(WEATHER_CACHE_STORAGE_KEY, JSON.stringify(entry));
+  } catch {
+    // quota/private mode — in-memory cache still works for this tab
+  }
+}
 let lastWeatherZip = "";
 let clockTimer: ReturnType<typeof setInterval> | null = null;
 let weatherRefreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -224,7 +246,9 @@ function stopClockTicker(): void {
 function startClockTicker(): void {
   tickClocks();
   if (clockTimer != null) return;
-  clockTimer = setInterval(tickClocks, 1000);
+  // Hands only have minute precision — per-second ticks were 30× the work
+  // for zero visible change.
+  clockTimer = setInterval(tickClocks, 30 * 1000);
 }
 
 /** Same as original single-city temp styling (°F + color). */
@@ -798,21 +822,23 @@ export async function refreshWeather(opts: { force?: boolean } = {}): Promise<vo
     return;
   }
 
-  const cacheHit =
-    !force &&
-    weatherCache &&
-    weatherCache.zip === zip &&
-    Date.now() - weatherCache.at < WEATHER_CACHE_MS;
+  hydrateWeatherCache();
 
-  if (cacheHit && weatherCache) {
-    renderWeatherBundle(weatherCache);
-    return;
+  // Stale-while-revalidate: paint whatever we have immediately, then only
+  // hit the network when the snapshot is actually stale (or forced).
+  const cached = weatherCache?.zip === zip ? weatherCache : null;
+  if (cached) {
+    renderWeatherBundle(cached);
+    const fresh = Date.now() - cached.at < WEATHER_CACHE_MS;
+    if (fresh && !force) return;
   }
 
   if (weatherFetchInFlight) return;
   weatherFetchInFlight = true;
-  els.weatherBadge.textContent = "…";
-  els.weatherBadge.classList.add("dim");
+  if (!cached) {
+    els.weatherBadge.textContent = "…";
+    els.weatherBadge.classList.add("dim");
+  }
 
   try {
     const geo = await geocodeZip(zip);
@@ -841,6 +867,7 @@ export async function refreshWeather(opts: { force?: boolean } = {}): Promise<vo
       extras: { london, knoxville },
     };
     weatherCache = entry;
+    persistWeatherCache(entry);
     lastWeatherZip = zip;
     renderWeatherBundle(entry);
   } catch (err) {
