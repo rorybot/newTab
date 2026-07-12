@@ -10,6 +10,7 @@ import { initRoomPane } from "./features/room/room-pane.js";
 import { initSpotifyPane } from "./features/spotify/spotify-pane.js";
 import { initWeatherPane } from "./features/weather/weather-pane.js";
 import { initEtymologyPane } from "./features/etymology/etymology-pane.js";
+import { initHnPane } from "./features/hn/hn-pane.js";
 import { initAnglishPane } from "./features/anglish/anglish-pane.js";
 import { applyFeatureVisibility } from "./lib/dom.js";
 import { getSettings, loadSettings } from "./settings/store.js";
@@ -37,6 +38,10 @@ async function bootstrap(): Promise<void> {
 
   if (isFeatureEnabled("spotify")) {
     initSpotifyPane();
+  }
+
+  if (isFeatureEnabled("hn")) {
+    initHnPane();
   }
 
   if (isFeatureEnabled("room")) {

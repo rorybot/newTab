@@ -276,19 +276,32 @@
           </div>
         </article>
 
-        <!-- Hacker News -->
-        <article class="pane pane-md" id="hn-pane">
+        <!-- Hacker News — main pane, retro TUI story table -->
+        <article class="pane pane-md pane-hn" id="hn-pane" data-feature="hn">
           <header class="pane-titlebar">
             <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
             <span class="pane-name">hn</span>
-            <span class="pane-badge dim">stub</span>
+            <span class="pane-badge dim" id="hn-badge">…</span>
+            <button type="button" id="hn-refresh" class="pane-action" title="Refresh stories (r)" aria-label="Refresh Hacker News stories" hidden>↻</button>
           </header>
-          <div class="pane-body">
-            <ol class="tui-list mono">
-              <li><span class="rank">1.</span> <span class="muted">front page mock…</span></li>
-              <li><span class="rank">2.</span> <span class="muted">story list TUI</span></li>
-              <li><span class="rank">3.</span> <span class="muted">coming soon</span></li>
-            </ol>
+          <div class="pane-body hn-body mono">
+            <div class="hn-toolbar">
+              <span class="hn-deco" aria-hidden="true">┌─</span>
+              <div class="hn-tabs" id="hn-tabs" role="tablist" aria-label="Story lists">
+                <button type="button" class="hn-tab is-active" data-list="top" role="tab">top</button>
+                <button type="button" class="hn-tab" data-list="new" role="tab">new</button>
+                <button type="button" class="hn-tab" data-list="ask" role="tab">ask</button>
+                <button type="button" class="hn-tab" data-list="show" role="tab">show</button>
+              </div>
+              <span class="hn-deco" aria-hidden="true">─</span>
+              <button type="button" id="hn-sort" class="hn-sort-btn" title="Toggle sort by points">sort: feed</button>
+              <span class="hn-hint muted">j/k · ⏎ cmt · o open · r</span>
+              <span class="hn-deco" aria-hidden="true">─┐</span>
+            </div>
+            <div class="hn-table-wrap">
+              <div id="hn-table" class="hn-table" role="table" aria-label="Hacker News stories"></div>
+            </div>
+            <p id="hn-status" class="hn-status muted" hidden></p>
           </div>
         </article>
 
