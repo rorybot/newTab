@@ -177,9 +177,14 @@ body.has-bg-image .bg-scrim {
   flex: 1;
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  grid-auto-rows: minmax(9rem, auto);
+  grid-auto-rows: auto;
   gap: 0.85rem;
+  align-items: start;
   align-content: start;
+}
+
+.pane-column {
+  display: contents;
 }
 
 .pane {
@@ -346,68 +351,25 @@ body.has-bg-image .bg-scrim {
 
 @media (min-width: 1100px) {
   .pane-grid {
-    grid-template-columns: repeat(12, 1fr);
-    grid-template-rows: auto auto auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  /* HN takes center stage; life ring moves to the row below */
-  .pane-life {
-    grid-column: 1 / span 4;
-    grid-row: 3;
-    justify-self: center;
-    width: fit-content;
+  .pane-column {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.85rem;
   }
 
-  #weather-pane {
-    grid-column: 1 / span 4;
-    grid-row: 1 / span 2;
-    min-height: 22rem;
+  .pane-column > .pane {
+    width: 100%;
+    min-height: 0;
   }
-  #spotify-pane {
-    grid-column: 11 / span 2;
-    grid-row: 1;
-  }
-  #radar-pane {
-    grid-column: 11 / span 2;
-    grid-row: 2;
-  }
-  #hn-pane {
-    grid-column: 5 / span 6;
-    grid-row: 1 / span 2;
-    min-height: 34rem;
+
+  .pane-column > #hn-pane {
     max-height: 46rem;
   }
-  #room-pane {
-    grid-column: 5 / span 4;
-    grid-row: 3;
-  }
-  #chat-pane {
-    grid-column: 9 / span 4;
-    grid-row: 3;
-  }
 
-  /* slight float offsets — sexy multi-pane desktop, not rigid table */
-  #weather-pane {
-    transform: translateY(0.35rem);
-  }
-  #spotify-pane {
-    transform: translateY(0.5rem);
-  }
-  #radar-pane {
-    transform: translateY(-0.25rem);
-  }
-  #hn-pane {
-    transform: translateY(0.2rem);
-  }
-  .pane-life {
-    transform: translate(0.15rem, 0.2rem);
-  }
-  #room-pane {
-    transform: translateY(0.35rem);
-  }
-  #chat-pane {
-    transform: translate(-0.15rem, 0.15rem);
-  }
 }
 
 /* ── Life ring pane ── */
@@ -1769,6 +1731,49 @@ body.nt-hidden .wx-spf-warn.hot::after {
 .hn-item.is-selected .hn-domain,
 .hn-item.is-selected a {
   color: #171310;
+}
+
+.hn-item.is-pending-hide {
+  --hn-hide-ms: 4800ms;
+  animation: hn-hide-glow var(--hn-hide-ms) ease-in forwards;
+}
+
+.hn-item.is-pending-hide.is-selected {
+  background: rgba(40, 90, 60, 0.85);
+  box-shadow: inset 0 0 0 1px #70d8a0;
+}
+
+.hn-item.is-pending-hide .hn-story-link { color: #c8e8d0; }
+
+@keyframes hn-hide-glow {
+  0% { opacity: 1; filter: none; box-shadow: inset 0 0 0 rgba(112, 216, 160, 0); }
+  12% { opacity: 0.88; box-shadow: inset 0 0 24px rgba(112, 216, 160, 0.55), 0 0 12px rgba(112, 216, 160, 0.35); }
+  35% { opacity: 0.62; box-shadow: inset 0 0 18px rgba(112, 216, 160, 0.4), 0 0 8px rgba(112, 216, 160, 0.25); }
+  70% { opacity: 0.32; box-shadow: inset 0 0 10px rgba(80, 160, 110, 0.2); }
+  100% { opacity: 0.06; filter: grayscale(0.4); box-shadow: none; }
+}
+
+.hn-undo {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  transform: translateX(-50%);
+  z-index: 80;
+  width: min(420px, calc(100vw - 2rem));
+}
+
+.hn-undo[hidden] { display: none !important; }
+.hn-undo-inner { position: relative; display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0.85rem 0.85rem; overflow: hidden; color: var(--text); background: rgba(8, 28, 18, 0.96); border: 1px solid #70d8a0; box-shadow: 0 0 0 1px #000, 0 0 24px rgba(112, 216, 160, 0.25), 0 12px 32px rgba(0, 0, 0, 0.45); }
+.hn-undo-msg { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.hn-undo-label { color: #70d8a0; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.hn-undo-title { overflow: hidden; color: #e0f0e8; font-size: 0.8rem; text-overflow: ellipsis; white-space: nowrap; }
+.hn-undo-button { flex-shrink: 0; padding: 0.35rem 0.6rem; border: 1px solid #70d8a0; border-radius: 0; background: rgba(112, 216, 160, 0.12); color: #70d8a0; font: inherit; cursor: pointer; }
+.hn-undo-button:hover { background: #70d8a0; color: #0a1420; }
+.hn-undo-bar { position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: #70d8a0; transform-origin: left center; animation: hn-undo-bar-shrink 4800ms linear forwards; box-shadow: 0 0 8px rgba(112, 216, 160, 0.6); }
+
+@keyframes hn-undo-bar-shrink {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
 }
 
 .hn-col-title {

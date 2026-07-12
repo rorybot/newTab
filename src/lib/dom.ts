@@ -16,7 +16,7 @@ export function applyFeatureVisibility(
     const name = el.dataset.feature;
     if (!name) return;
     const on = flags[name] === true;
-    el.hidden = !on;
+    if (!on) el.hidden = true;
     el.classList.toggle("feature-off", !on);
   });
 }

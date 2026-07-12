@@ -22,7 +22,29 @@ function syncVisibilityClass(): void {
   document.body.classList.toggle("nt-hidden", document.hidden);
 }
 
+function organizePaneColumns(): void {
+  const grid = document.querySelector<HTMLElement>(".pane-grid");
+  if (!grid) return;
+
+  const groups = [
+    ["weather-pane", "life-pane"],
+    ["hn-pane", "room-pane", "etymology-pane"],
+    ["spotify-pane", "radar-pane", "chat-pane", "anglish-pane"],
+  ];
+
+  for (const ids of groups) {
+    const column = document.createElement("div");
+    column.className = "pane-column";
+    for (const id of ids) {
+      const pane = document.getElementById(id);
+      if (pane) column.append(pane);
+    }
+    grid.append(column);
+  }
+}
+
 async function bootstrap(): Promise<void> {
+  organizePaneColumns();
   applyFeatureVisibility(FEATURES);
   syncVisibilityClass();
   document.addEventListener("visibilitychange", syncVisibilityClass);

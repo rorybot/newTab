@@ -295,7 +295,7 @@
               </div>
               <span class="hn-deco" aria-hidden="true">─</span>
               <button type="button" id="hn-sort" class="hn-sort-btn" title="Toggle sort by points">sort: feed</button>
-              <span class="hn-hint muted">j/k · ⏎ cmt · o open · r</span>
+              <span class="hn-hint muted">j/k · ⏎ cmt · o open · x hide · u undo · r</span>
               <span class="hn-deco" aria-hidden="true">─┐</span>
             </div>
             <div class="hn-table-wrap">
@@ -304,6 +304,17 @@
             <p id="hn-status" class="hn-status muted" hidden></p>
           </div>
         </article>
+
+        <div id="hn-undo" class="hn-undo" data-feature="hn" hidden>
+          <div class="hn-undo-inner mono">
+            <div class="hn-undo-msg">
+              <span class="hn-undo-label">hidden</span>
+              <span id="hn-undo-title" class="hn-undo-title"></span>
+            </div>
+            <button type="button" id="hn-undo-button" class="hn-undo-button" title="Undo hide (u)">undo · u</button>
+            <div id="hn-undo-bar" class="hn-undo-bar" aria-hidden="true"></div>
+          </div>
+        </div>
 
         <!-- Room: one-shot snapshot (feature-flagged; off until login scrape is designed) -->
         <article class="pane pane-md pane-room" id="room-pane" data-feature="room">
