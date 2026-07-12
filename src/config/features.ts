@@ -22,6 +22,8 @@ export const FEATURES = {
   etymology: true,
   /** Anglish Germanic alternatives (mock TUI) */
   anglish: true,
+  /** Local flight radar — nearby aircraft via free ADS-B (adsb.fi). */
+  radar: true,
 } as const;
 
 export type FeatureName = keyof typeof FEATURES;

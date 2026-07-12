@@ -12,6 +12,12 @@ export interface Settings {
    */
   roomJsonUrl: string;
   bgImage: string;
+  /** Radar origin latitude (decimal degrees). Empty → derive from zipCode. */
+  radarLat: string;
+  /** Radar origin longitude (decimal degrees). Empty → derive from zipCode. */
+  radarLon: string;
+  /** Radar search radius in nautical miles (source APIs cap at 250). */
+  radarRadiusNm: number;
   /** Spotify Developer Dashboard → Client ID (local only; never commit). */
   spotifyClientId: string;
   /** Spotify Client Secret (local only; never commit). */
@@ -26,6 +32,9 @@ export const DEFAULTS: Settings = {
   zipCode: "",
   roomJsonUrl: "",
   bgImage: "",
+  radarLat: "",
+  radarLon: "",
+  radarRadiusNm: 25,
   spotifyClientId: "",
   spotifyClientSecret: "",
 };

@@ -354,18 +354,35 @@
           </div>
         </article>
 
-        <!-- Flight radar -->
-        <article class="pane pane-sm" id="radar-pane">
+        <!-- Flight radar — planes around home via free ADS-B -->
+        <article class="pane pane-sm" id="radar-pane" data-feature="radar">
           <header class="pane-titlebar">
             <span class="pane-dots" aria-hidden="true"><i></i><i></i><i></i></span>
             <span class="pane-name">radar</span>
-            <span class="pane-badge dim">stub</span>
+            <span class="pane-badge dim" id="radar-badge">…</span>
+            <button type="button" id="radar-refresh" class="pane-action" title="Refresh nearby aircraft" aria-label="Refresh nearby aircraft" hidden>↻</button>
           </header>
-          <div class="pane-body">
-            <div class="radar-deco" aria-hidden="true">
-              <span class="radar-sweep"></span>
+          <div class="pane-body radar-body mono">
+            <div id="radar-setup" class="radar-setup">
+              <p class="muted">set zip (or radar lat/lon) in settings</p>
+              <p class="muted">planes nearby · free adsb feed</p>
             </div>
-            <p class="pane-placeholder">Local ADS-B — coming soon</p>
+            <div id="radar-live" class="radar-live" hidden>
+              <div class="radar-top">
+                <div class="radar-deco radar-scope" aria-hidden="true">
+                  <span class="radar-sweep"></span>
+                  <span class="radar-home"></span>
+                  <div id="radar-blips" class="radar-blips"></div>
+                </div>
+                <div class="radar-meta">
+                  <p id="radar-origin" class="radar-origin muted">—</p>
+                  <p id="radar-range" class="muted">±— nm</p>
+                  <p id="radar-count" class="radar-count">— aircraft</p>
+                </div>
+              </div>
+              <div id="radar-table" class="radar-table" role="table" aria-label="Nearby aircraft"></div>
+            </div>
+            <p id="radar-status" class="radar-status muted" hidden></p>
           </div>
         </article>
 
@@ -479,6 +496,39 @@
           />
         </label>
         <p class="field-hint">Not pure ASCII — real photos/art welcome. Scrim keeps panes readable.</p>
+
+        <div class="settings-section" data-feature="radar">
+          <h3 class="settings-section-title mono">radar</h3>
+          <label class="field">
+            <span>Latitude (optional)</span>
+            <input
+              type="text"
+              id="radar-lat"
+              name="radarLat"
+              inputmode="decimal"
+              placeholder="e.g. 39.7392"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <label class="field">
+            <span>Longitude (optional)</span>
+            <input
+              type="text"
+              id="radar-lon"
+              name="radarLon"
+              inputmode="decimal"
+              placeholder="e.g. -104.9903"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <label class="field">
+            <span>Radius (nautical miles)</span>
+            <input type="number" id="radar-radius" name="radarRadiusNm" min="1" max="250" value="25" />
+          </label>
+          <p class="field-hint">Leave lat/lon empty to use the zip code above. Free ADS-B data (adsb.fi, airplanes.live fallback), refreshed once a minute.</p>
+        </div>
 
         <div class="settings-section" data-feature="spotify">
           <h3 class="settings-section-title mono">spotify</h3>

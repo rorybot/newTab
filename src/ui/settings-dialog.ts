@@ -14,6 +14,7 @@ import {
   normalizeZip,
   refreshWeather,
 } from "../features/weather/weather-pane.js";
+import { refreshRadar } from "../features/radar/radar-pane.js";
 import { getSettings, saveSettings } from "../settings/store.js";
 import { applyBackground } from "./background.js";
 import { els } from "./refs.js";
@@ -28,6 +29,11 @@ function fillForm(): void {
   els.showDeath.checked = Boolean(settings.showDeath);
   els.zipCode.value = settings.zipCode || "";
   els.bgImage.value = settings.bgImage || "";
+  if (isFeatureEnabled("radar")) {
+    els.radarLat.value = settings.radarLat || "";
+    els.radarLon.value = settings.radarLon || "";
+    els.radarRadius.value = String(settings.radarRadiusNm ?? 25);
+  }
   if (isFeatureEnabled("spotify")) {
     els.spotifyClientId.value = settings.spotifyClientId || "";
     els.spotifyClientSecret.value = settings.spotifyClientSecret || "";
@@ -89,6 +95,15 @@ export function initSettingsDialog(): void {
         ? readRoomSettingsField()
         : prev.roomJsonUrl,
       bgImage: (els.bgImage.value || "").trim(),
+      radarLat: isFeatureEnabled("radar")
+        ? (els.radarLat.value || "").trim()
+        : prev.radarLat,
+      radarLon: isFeatureEnabled("radar")
+        ? (els.radarLon.value || "").trim()
+        : prev.radarLon,
+      radarRadiusNm: isFeatureEnabled("radar")
+        ? Number(els.radarRadius.value) || 25
+        : prev.radarRadiusNm,
       spotifyClientId: isFeatureEnabled("spotify")
         ? (els.spotifyClientId.value || "").trim()
         : prev.spotifyClientId,
@@ -108,6 +123,10 @@ export function initSettingsDialog(): void {
 
     if (isFeatureEnabled("spotify")) {
       await onSpotifySettingsChanged();
+    }
+
+    if (isFeatureEnabled("radar")) {
+      await refreshRadar({ force: true });
     }
 
     if (isFeatureEnabled("room")) {

@@ -1353,6 +1353,149 @@ body.has-bg-image .bg-scrim {
   }
 }
 
+/* ── Radar (live) ── */
+
+.radar-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.radar-setup p,
+.radar-meta p {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.radar-top {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.radar-scope {
+  margin-bottom: 0;
+  width: 5.25rem;
+  height: 5.25rem;
+  flex: none;
+}
+
+.radar-home {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 4px var(--accent);
+}
+
+.radar-blips {
+  position: absolute;
+  inset: 0;
+}
+
+.radar-blip {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 3px rgba(196, 165, 116, 0.6);
+}
+
+.radar-blip.is-stale {
+  opacity: 0.35;
+  box-shadow: none;
+}
+
+.radar-blip.is-hot {
+  width: 7px;
+  height: 7px;
+  box-shadow: 0 0 8px var(--accent);
+  z-index: 1;
+}
+
+.radar-meta {
+  min-width: 0;
+}
+
+.radar-origin {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.radar-count {
+  color: var(--accent);
+}
+
+.radar-table {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.radar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.4rem 2.4rem 3rem;
+  align-items: baseline;
+  border-bottom: 1px solid rgba(72, 62, 50, 0.4);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.radar-row:last-child {
+  border-bottom: none;
+}
+
+.radar-head {
+  background: rgba(24, 20, 16, 0.95);
+  color: var(--accent);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--border);
+}
+
+.radar-cell {
+  padding: 0.18rem 0.45rem;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.radar-col-alt,
+.radar-col-kt,
+.radar-col-nm {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.radar-item {
+  cursor: pointer;
+}
+
+.radar-item:hover {
+  background: var(--accent-soft);
+}
+
+.radar-empty {
+  margin: 0;
+  padding: 0.6rem;
+  font-size: 0.72rem;
+}
+
+.radar-status {
+  margin: 0;
+  font-size: 0.66rem;
+}
+
 /* Pause decorative motion when the tab is backgrounded (class set by JS). */
 body.nt-hidden .radar-sweep,
 body.nt-hidden .wx-spf-warn.hot::after {

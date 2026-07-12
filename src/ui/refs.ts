@@ -78,6 +78,10 @@ export const els = {
   spotifyClientId: requireEl<HTMLInputElement>("spotify-client-id"),
   spotifyClientSecret: requireEl<HTMLInputElement>("spotify-client-secret"),
   spotifyRedirectUri: requireEl<HTMLElement>("spotify-redirect-uri"),
+  // Radar settings (pane elements are looked up lazily in radar-pane.ts)
+  radarLat: requireEl<HTMLInputElement>("radar-lat"),
+  radarLon: requireEl<HTMLInputElement>("radar-lon"),
+  radarRadius: requireEl<HTMLInputElement>("radar-radius"),
 };
 
 /** Optional room DOM — only required when FEATURES.room is on. */

@@ -7,7 +7,7 @@ const WEATHER_CACHE_MS = 10 * 60 * 1000;
 /** Cache survives page loads so a new tab paints instantly instead of re-fetching. */
 const WEATHER_CACHE_STORAGE_KEY = "newTabWeatherCache";
 
-interface GeoResult {
+export interface GeoResult {
   lat: number;
   lon: number;
   label: string;
@@ -557,7 +557,7 @@ function showWeatherError(msg: string): void {
   els.weatherBadge.classList.add("dim");
 }
 
-async function geocodeZip(zip: string): Promise<GeoResult> {
+export async function geocodeZip(zip: string): Promise<GeoResult> {
   const cleaned = normalizeZip(zip);
   const usZip = /^(\d{5})(?:-\d{4})?$/.exec(cleaned);
   if (usZip?.[1]) {

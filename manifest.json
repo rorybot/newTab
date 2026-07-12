@@ -15,6 +15,8 @@
     "https://geocoding-api.open-meteo.com/*",
     "https://api.zippopotam.us/*",
     "https://hacker-news.firebaseio.com/*",
+    "https://opendata.adsb.fi/*",
+    "https://api.airplanes.live/*",
     "https://news.ycombinator.com/*",
     "https://accounts.spotify.com/*",
     "https://api.spotify.com/*",

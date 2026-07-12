@@ -12,6 +12,7 @@ import { initWeatherPane } from "./features/weather/weather-pane.js";
 import { initEtymologyPane } from "./features/etymology/etymology-pane.js";
 import { initHnPane } from "./features/hn/hn-pane.js";
 import { initAnglishPane } from "./features/anglish/anglish-pane.js";
+import { initRadarPane } from "./features/radar/radar-pane.js";
 import { applyFeatureVisibility } from "./lib/dom.js";
 import { getSettings, loadSettings } from "./settings/store.js";
 import { applyBackground } from "./ui/background.js";
@@ -64,6 +65,10 @@ async function bootstrap(): Promise<void> {
 
   if (isFeatureEnabled("hn")) {
     initHnPane();
+  }
+
+  if (isFeatureEnabled("radar")) {
+    initRadarPane();
   }
 
   if (isFeatureEnabled("room")) {
