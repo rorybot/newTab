@@ -2,7 +2,7 @@
 
 ## Weather feed
 
-`build_feeds.py` writes `out/feeds/weather.json` (home forecast + London/Knoxville) when `WEATHER_LAT`/`WEATHER_LON` are set in `config.env` — see `config.example.env`. Run it on a schedule (cron/supercronic) alongside `serve_feed.py`; the extension's weather pane tries this feed first and falls back to its own direct client-side fetch (geolocation + Open-Meteo) if the feed is missing, stale, or too far from the browser's geolocated position.
+`build_feeds.py` writes `out/feeds/weather.json` (home forecast + London/Knoxville) when `WEATHER_LAT`/`WEATHER_LON` are set in `config.env` — see `config.example.env`. Run it on a schedule (cron/supercronic) alongside `serve_feed.py`; the extension's weather pane has no location source of its own (no geolocation, no zip) — it uses whatever `lat`/`lon` this feed reports as home. If the feed is unreachable, it falls back to a direct client-side fetch using the last coordinates a feed successfully gave it; on a fresh install that's never reached the backend, the pane just shows a "waiting on backend" message.
 
 ```bash
 cd backend

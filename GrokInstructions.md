@@ -48,7 +48,7 @@ Same settings dialog for first-run and later edits:
 | Field | Notes |
 |-------|--------|
 | Birth date / time | Required for life ring |
-| **Home label** | Cosmetic display name for the weather pane's home city; location comes from browser geolocation, not this field |
+| **Home label** | Cosmetic display name for the weather pane's home city; location comes from the backend weather feed, not this field |
 | Expected lifespan | Ring segments + optional death countdown |
 | Show death countdown | Toggle |
 | **Room JSON URL** | Only when `FEATURES.room` is on. One-shot snapshot JSON URL — not a live stream. Hidden while flag is off. |
@@ -59,7 +59,7 @@ Same settings dialog for first-run and later edits:
 
 ### Weather (live TUI)
 
-- Compact TUI pane driven by **browser geolocation** (`navigator.geolocation`) — no zip/geocoding step
+- Compact TUI pane driven entirely by the **backend feed** (`WEATHER_LAT`/`WEATHER_LON` in `backend/config.env`) — no zip/geocoding step, no browser geolocation, no client-side location setting at all
 - **Open-Meteo** forecast (no API key); cache key is the rounded lat/lon
 - Hero: sky glyph + large temp + place; chips for humidity, wind, UV, sunrise/sunset
 - **Next 12 hours**: temp, wind, and UV — each with colored values and a bar chart directly under that metric (no separate t/w sparkline block)

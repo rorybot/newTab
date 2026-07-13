@@ -6,7 +6,7 @@ Analysis of the codebase as of 2026-07 and a phased plan for moving data work ou
 
 | Pane | Client-side work today | Cost |
 |------|------------------------|------|
-| weather (`885 lines`) | browser geolocation + 3× Open-Meteo fetches (home + London + Knoxville) every 15 min, per open tab | Largest module; 3 network calls that every new-tab instance repeats (down from 4 since geocoding was dropped for geolocation); API shaping logic lives in the client |
+| weather (`885 lines`) | Backend feed provides home lat/lon + forecast directly; client only falls back to its own 3× Open-Meteo fetches if the feed is unreachable | Largest module; API shaping logic lives partly in the client still (fallback path) |
 | spotify | OAuth token refresh + ~8s polling | Fine where it is — OAuth uses `chrome.identity`, must stay in the extension |
 | etymology / anglish | Hardcoded 3-entry demo arrays bundled into `newtab.js` | No real data source; growing the dataset bloats the bundle |
 | room (off) | Blocked on login-aware scrape — backend-only by design | Already follows the target pattern |
@@ -56,11 +56,10 @@ If server-rendered fragments ever become genuinely appealing (e.g. a complex HN 
 - Anglish: seed from the Anglish Wordbook dataset; curate.
 - HN pane: build it feed-first — backend hits Algolia HN API, writes `hn.json`; extension just renders. No client API calls from day one.
 
-### Phase 2 — weather goes server-side (biggest client win)
-- Backend fetches Open-Meteo for a fixed home lat/lon + extra cities every ~10 min, writes `weather.json` shaped exactly for the pane (chips, 12-hour bars, extra-city temps pre-computed).
-- Extension: weather pane gets a feed path; **keep the current client fetch as fallback** when the feed is stale/missing (check `updatedAt`).
-- Home location moves into `backend/config.env` as `WEATHER_LAT`/`WEATHER_LON` (the backend can't call `navigator.geolocation` — it needs its own fixed coordinates, unlike the extension). This cuts the extension from ~3 API calls per refresh to 1 local GET, and most of weather-pane.ts's shaping logic migrates to Python.
-- **Matching, now that the client uses geolocation instead of a zip setting:** the extension only trusts the feed when its own geolocated position is within a small tolerance (e.g. ~5–10 km) of the feed's `lat`/`lon` — a straight equality check (like the old zip match) won't work since GPS/Wi-Fi positioning always has some jitter. Falls back to the direct client fetch otherwise, same as any other stale/missing-feed case.
+### Phase 2 — weather goes server-side (biggest client win) — done
+- Backend fetches Open-Meteo for a fixed home lat/lon + extra cities, writes `weather.json` shaped exactly for the pane (chips, 12-hour bars, extra-city temps pre-computed).
+- Home location lives *only* in `backend/config.env` as `WEATHER_LAT`/`WEATHER_LON` — no geolocation, no zip, no client-side location setting of any kind. The extension has no independent notion of "home"; it uses whatever lat/lon the feed reports. This cuts the extension from ~3 API calls per refresh to 1 local GET, and most of weather-pane.ts's shaping logic lives in Python.
+- **No matching needed** (superseded the earlier geolocation-based design): since there's no second, independent location source on the client, there's nothing to reconcile against the feed's coordinates. If the feed is unreachable, the pane falls back to a direct client fetch using the last coordinates a feed successfully provided (cached in `localStorage`) — a fresh install that's never reached the backend just shows a "waiting on backend" message instead of prompting for input.
 
 ### Phase 3 — room + config adoption
 - Solve the room login scrape (Playwright `storage_state`, per GrokInstructions) — output joins the same feeds dir.

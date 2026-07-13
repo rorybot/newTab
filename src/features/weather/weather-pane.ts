@@ -7,12 +7,10 @@ const WEATHER_REFRESH_MS = 15 * 60 * 1000;
 const WEATHER_CACHE_MS = 10 * 60 * 1000;
 /** Cache survives page loads so a new tab paints instantly instead of re-fetching. */
 const WEATHER_CACHE_STORAGE_KEY = "newTabWeatherCache";
-/** How close the browser's geolocated position must be to a feed's fixed
- * home lat/lon before we trust it — GPS/Wi-Fi positioning always jitters a
- * bit, so this can't be an exact match (see OPTIMIZATION_PLAN.md Phase 2). */
-const FEED_MATCH_RADIUS_KM = 15;
 
-interface GeoPosition {
+/** Home location comes entirely from the backend feed (WEATHER_LAT/WEATHER_LON
+ * in backend/config.env) — no browser geolocation, no client-side setting. */
+interface HomeCoords {
   lat: number;
   lon: number;
 }
@@ -187,33 +185,9 @@ export function normalizeHomeLabel(raw: string | null | undefined): string {
   return t || "home";
 }
 
-/** Cache key for a geolocated position — rounded to ~1km so tiny GPS jitter
- * between refreshes still hits the same cache entry. */
+/** Cache key for a set of home coordinates — rounded to ~1km. */
 function locKey(lat: number, lon: number): string {
   return `${lat.toFixed(2)},${lon.toFixed(2)}`;
-}
-
-function getHomePosition(): Promise<GeoPosition> {
-  return new Promise((resolve, reject) => {
-    if (!("geolocation" in navigator)) {
-      reject(new Error("geolocation unsupported"));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-      (err) => {
-        const messages: Record<number, string> = {
-          1: "location permission denied",
-          2: "location unavailable",
-          3: "location request timed out",
-        };
-        reject(new Error(messages[err.code] || err.message || "location error"));
-      },
-      // Browser-level position cache (maximumAge) means most refreshes don't
-      // even need a fresh GPS/Wi-Fi fix, only a fresh forecast fetch.
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 10 * 60 * 1000 },
-    );
-  });
 }
 
 /** Local hours/minutes in a timezone for analog clock hands. */
@@ -800,19 +774,6 @@ function renderWeatherBundle(entry: WeatherCacheEntry): void {
   els.weatherBadge.classList.remove("dim");
 }
 
-/** Haversine great-circle distance in km. */
-function distanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
 function extraFromFeed(
   city: (typeof EXTRA_CITIES)[number],
   feedCity: WeatherFeedExtraCity | undefined,
@@ -826,16 +787,15 @@ function extraFromFeed(
   };
 }
 
-/** Try the backend feed (backend/build_feeds.py's weather.json) before doing
- * any client-side fetches. Only trusted when its fixed lat/lon is close to
- * the browser's geolocated position; null on any miss so the caller falls
- * back to the direct multi-fetch path — a new tab must never depend on the
- * backend being up. */
-async function fetchWeatherFromFeed(pos: GeoPosition, key: string): Promise<WeatherCacheEntry | null> {
+/** Try the backend feed (backend/build_feeds.py's weather.json) first — its
+ * WEATHER_LAT/WEATHER_LON *is* the home location; there's nothing to match
+ * against locally anymore. Null on any miss so the caller falls back to a
+ * direct fetch using the last-known coords — a new tab must never depend on
+ * the backend being up. */
+async function fetchWeatherFromFeed(): Promise<WeatherCacheEntry | null> {
   const feed = await loadFeed<WeatherFeedEntry>("weather");
   const item = feed?.entries[0];
   if (!item) return null;
-  if (distanceKm(pos.lat, pos.lon, item.lat, item.lon) > FEED_MATCH_RADIUS_KM) return null;
 
   const homeTz =
     item.timezone ||
@@ -845,9 +805,9 @@ async function fetchWeatherFromFeed(pos: GeoPosition, key: string): Promise<Weat
   const homeLabel = normalizeHomeLabel(getSettings().homeLabel);
 
   return {
-    loc: key,
-    lat: pos.lat,
-    lon: pos.lon,
+    loc: locKey(item.lat, item.lon),
+    lat: item.lat,
+    lon: item.lon,
     at: Date.parse(feed.updatedAt) || Date.now(),
     home: { label: homeLabel, shortLabel: homeLabel, timezone: homeTz, forecast: item.forecast },
     extras: {
@@ -857,7 +817,11 @@ async function fetchWeatherFromFeed(pos: GeoPosition, key: string): Promise<Weat
   };
 }
 
-async function fetchWeatherDirect(pos: GeoPosition, key: string): Promise<WeatherCacheEntry> {
+/** Fallback when the feed is unreachable: re-fetch directly using the last
+ * coordinates a feed successfully gave us (cached across page loads). There's
+ * no other source of "home" once geolocation is gone, so this only works
+ * after at least one successful feed fetch. */
+async function fetchWeatherDirect(pos: HomeCoords): Promise<WeatherCacheEntry> {
   const [forecast, london, knoxville] = await Promise.all([
     fetchOpenMeteo(pos.lat, pos.lon, { full: true }),
     fetchExtraCity(EXTRA_CITIES[0]!),
@@ -871,7 +835,7 @@ async function fetchWeatherDirect(pos: GeoPosition, key: string): Promise<Weathe
   const homeLabel = normalizeHomeLabel(getSettings().homeLabel);
 
   return {
-    loc: key,
+    loc: locKey(pos.lat, pos.lon),
     lat: pos.lat,
     lon: pos.lon,
     at: Date.now(),
@@ -885,48 +849,38 @@ export async function refreshWeather(opts: { force?: boolean } = {}): Promise<vo
 
   hydrateWeatherCache();
 
-  let pos: GeoPosition;
-  try {
-    pos = await getHomePosition();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "location unavailable";
-    if (weatherCache) {
-      renderWeatherBundle(weatherCache);
-      els.wxError.hidden = false;
-      els.wxError.textContent = `stale · ${msg}`;
-    } else {
-      showWeatherSetup(msg);
-    }
-    return;
-  }
-
-  const key = locKey(pos.lat, pos.lon);
-
   // Stale-while-revalidate: paint whatever we have immediately, then only
   // hit the network when the snapshot is actually stale (or forced).
-  const cached = weatherCache?.loc === key ? weatherCache : null;
-  if (cached) {
-    renderWeatherBundle(cached);
-    const fresh = Date.now() - cached.at < WEATHER_CACHE_MS;
+  if (weatherCache) {
+    renderWeatherBundle(weatherCache);
+    const fresh = Date.now() - weatherCache.at < WEATHER_CACHE_MS;
     if (fresh && !force) return;
   }
 
   if (weatherFetchInFlight) return;
   weatherFetchInFlight = true;
-  if (!cached) {
+  if (!weatherCache) {
     els.weatherBadge.textContent = "…";
     els.weatherBadge.classList.add("dim");
   }
 
   try {
-    const entry = (await fetchWeatherFromFeed(pos, key)) ?? (await fetchWeatherDirect(pos, key));
+    const entry =
+      (await fetchWeatherFromFeed()) ??
+      (weatherCache ? await fetchWeatherDirect({ lat: weatherCache.lat, lon: weatherCache.lon }) : null);
+
+    if (!entry) {
+      showWeatherSetup("waiting on backend weather feed (no location configured yet)");
+      return;
+    }
+
     weatherCache = entry;
     persistWeatherCache(entry);
     renderWeatherBundle(entry);
   } catch (err) {
     console.warn("weather refresh failed", err);
     const msg = err instanceof Error ? err.message : "weather unavailable";
-    if (weatherCache?.loc === key) {
+    if (weatherCache) {
       renderWeatherBundle(weatherCache);
       els.wxError.hidden = false;
       els.wxError.textContent = `stale · ${msg}`;

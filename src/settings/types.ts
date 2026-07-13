@@ -4,7 +4,7 @@ export interface Settings {
   lifespan: number;
   showDeath: boolean;
   /** Cosmetic display name for the weather pane's home city; location itself
-   * comes from browser geolocation, not this field. */
+   * comes from the backend weather feed (WEATHER_LAT/WEATHER_LON), not this field. */
   homeLabel: string;
   /**
    * URL of a one-shot room snapshot JSON (recent shouts only — not a live feed).
