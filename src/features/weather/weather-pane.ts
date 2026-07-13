@@ -1,3 +1,4 @@
+import { loadFeed } from "../../lib/feeds.js";
 import { pad } from "../../lib/format.js";
 import { getSettings } from "../../settings/store.js";
 import { els } from "../../ui/refs.js";
@@ -6,11 +7,33 @@ const WEATHER_REFRESH_MS = 15 * 60 * 1000;
 const WEATHER_CACHE_MS = 10 * 60 * 1000;
 /** Cache survives page loads so a new tab paints instantly instead of re-fetching. */
 const WEATHER_CACHE_STORAGE_KEY = "newTabWeatherCache";
+/** How close the browser's geolocated position must be to a feed's fixed
+ * home lat/lon before we trust it — GPS/Wi-Fi positioning always jitters a
+ * bit, so this can't be an exact match (see OPTIMIZATION_PLAN.md Phase 2). */
+const FEED_MATCH_RADIUS_KM = 15;
 
-interface GeoResult {
+interface GeoPosition {
   lat: number;
   lon: number;
-  label: string;
+}
+
+/** Shape written by backend/build_feeds.py's build_weather_entry(). */
+interface WeatherFeedExtraCity {
+  lat: number;
+  lon: number;
+  timezone?: string;
+  current?: OpenMeteoCurrent;
+}
+
+interface WeatherFeedEntry {
+  lat: number;
+  lon: number;
+  timezone?: string;
+  forecast: OpenMeteoForecast;
+  extras: {
+    london: WeatherFeedExtraCity;
+    knoxville: WeatherFeedExtraCity;
+  };
 }
 
 interface OpenMeteoCurrent {
@@ -67,7 +90,7 @@ interface ExtraCityCurrent {
   weatherCode: number | undefined;
 }
 
-/** Fixed extra cities shown beside home (from zip). */
+/** Fixed extra cities shown beside home. */
 const EXTRA_CITIES = [
   {
     id: "london" as const,
@@ -94,7 +117,9 @@ interface HourSlice {
 }
 
 interface WeatherCacheEntry {
-  zip: string;
+  loc: string;
+  lat: number;
+  lon: number;
   at: number;
   home: WeatherPayload;
   extras: {
@@ -114,29 +139,6 @@ interface BarOpts {
   chartPx?: number;
 }
 
-interface ZippopotamPlace {
-  latitude: string;
-  longitude: string;
-  "place name": string;
-  "state abbreviation": string;
-}
-
-interface ZippopotamResponse {
-  places?: ZippopotamPlace[];
-}
-
-interface OpenMeteoGeoHit {
-  name?: string;
-  admin1?: string;
-  country_code?: string;
-  latitude: number;
-  longitude: number;
-}
-
-interface OpenMeteoGeoResponse {
-  results?: OpenMeteoGeoHit[];
-}
-
 let weatherCache: WeatherCacheEntry | null = null;
 let weatherFetchInFlight = false;
 
@@ -146,7 +148,7 @@ function hydrateWeatherCache(): void {
     const raw = localStorage.getItem(WEATHER_CACHE_STORAGE_KEY);
     if (!raw) return;
     const entry = JSON.parse(raw) as WeatherCacheEntry;
-    if (entry?.zip && entry.home && entry.extras) weatherCache = entry;
+    if (entry?.loc && entry.home && entry.extras) weatherCache = entry;
   } catch {
     // corrupt cache — ignore; next successful fetch rewrites it
   }
@@ -159,7 +161,6 @@ function persistWeatherCache(entry: WeatherCacheEntry): void {
     // quota/private mode — in-memory cache still works for this tab
   }
 }
-let lastWeatherZip = "";
 let clockTimer: ReturnType<typeof setInterval> | null = null;
 let weatherRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -181,20 +182,38 @@ function formatterForTz(timeZone: string): Intl.DateTimeFormat {
   return fmt;
 }
 
-export function normalizeZip(raw: string | null | undefined): string {
-  return String(raw || "").trim();
+export function normalizeHomeLabel(raw: string | null | undefined): string {
+  const t = String(raw || "").trim();
+  return t || "home";
 }
 
-export function getLastWeatherZip(): string {
-  return lastWeatherZip;
+/** Cache key for a geolocated position — rounded to ~1km so tiny GPS jitter
+ * between refreshes still hits the same cache entry. */
+function locKey(lat: number, lon: number): string {
+  return `${lat.toFixed(2)},${lon.toFixed(2)}`;
 }
 
-function shortPlaceLabel(full: string): string {
-  const t = full.trim();
-  if (!t) return "home";
-  // "Castle Rock, CO 80104" → "Castle Rock"
-  const beforeComma = t.split(",")[0]?.trim();
-  return beforeComma || t;
+function getHomePosition(): Promise<GeoPosition> {
+  return new Promise((resolve, reject) => {
+    if (!("geolocation" in navigator)) {
+      reject(new Error("geolocation unsupported"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      (err) => {
+        const messages: Record<number, string> = {
+          1: "location permission denied",
+          2: "location unavailable",
+          3: "location request timed out",
+        };
+        reject(new Error(messages[err.code] || err.message || "location error"));
+      },
+      // Browser-level position cache (maximumAge) means most refreshes don't
+      // even need a fresh GPS/Wi-Fi fix, only a fresh forecast fetch.
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 10 * 60 * 1000 },
+    );
+  });
 }
 
 /** Local hours/minutes in a timezone for analog clock hands. */
@@ -557,38 +576,6 @@ function showWeatherError(msg: string): void {
   els.weatherBadge.classList.add("dim");
 }
 
-async function geocodeZip(zip: string): Promise<GeoResult> {
-  const cleaned = normalizeZip(zip);
-  const usZip = /^(\d{5})(?:-\d{4})?$/.exec(cleaned);
-  if (usZip?.[1]) {
-    const res = await fetch(`https://api.zippopotam.us/us/${usZip[1]}`);
-    if (!res.ok) throw new Error(`zip lookup failed (${res.status})`);
-    const data = (await res.json()) as ZippopotamResponse;
-    const place = data.places?.[0];
-    if (!place) throw new Error("zip not found");
-    return {
-      lat: Number(place.latitude),
-      lon: Number(place.longitude),
-      label: `${place["place name"]}, ${place["state abbreviation"]} ${usZip[1]}`,
-    };
-  }
-
-  const q = encodeURIComponent(cleaned);
-  const res = await fetch(
-    `https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=1&language=en&format=json`,
-  );
-  if (!res.ok) throw new Error(`geocode failed (${res.status})`);
-  const data = (await res.json()) as OpenMeteoGeoResponse;
-  const hit = data.results?.[0];
-  if (!hit) throw new Error("location not found");
-  const parts = [hit.name, hit.admin1, hit.country_code].filter(Boolean);
-  return {
-    lat: hit.latitude,
-    lon: hit.longitude,
-    label: parts.join(", "),
-  };
-}
-
 async function fetchOpenMeteo(
   lat: number,
   lon: number,
@@ -813,20 +800,111 @@ function renderWeatherBundle(entry: WeatherCacheEntry): void {
   els.weatherBadge.classList.remove("dim");
 }
 
+/** Haversine great-circle distance in km. */
+function distanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function extraFromFeed(
+  city: (typeof EXTRA_CITIES)[number],
+  feedCity: WeatherFeedExtraCity | undefined,
+): ExtraCityCurrent {
+  return {
+    label: city.shortLabel,
+    shortLabel: city.shortLabel,
+    timezone: feedCity?.timezone || city.timezone,
+    temp: feedCity?.current?.temperature_2m,
+    weatherCode: feedCity?.current?.weather_code,
+  };
+}
+
+/** Try the backend feed (backend/build_feeds.py's weather.json) before doing
+ * any client-side fetches. Only trusted when its fixed lat/lon is close to
+ * the browser's geolocated position; null on any miss so the caller falls
+ * back to the direct multi-fetch path — a new tab must never depend on the
+ * backend being up. */
+async function fetchWeatherFromFeed(pos: GeoPosition, key: string): Promise<WeatherCacheEntry | null> {
+  const feed = await loadFeed<WeatherFeedEntry>("weather");
+  const item = feed?.entries[0];
+  if (!item) return null;
+  if (distanceKm(pos.lat, pos.lon, item.lat, item.lon) > FEED_MATCH_RADIUS_KM) return null;
+
+  const homeTz =
+    item.timezone ||
+    item.forecast.timezone ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    "America/Denver";
+  const homeLabel = normalizeHomeLabel(getSettings().homeLabel);
+
+  return {
+    loc: key,
+    lat: pos.lat,
+    lon: pos.lon,
+    at: Date.parse(feed.updatedAt) || Date.now(),
+    home: { label: homeLabel, shortLabel: homeLabel, timezone: homeTz, forecast: item.forecast },
+    extras: {
+      london: extraFromFeed(EXTRA_CITIES[0]!, item.extras.london),
+      knoxville: extraFromFeed(EXTRA_CITIES[1]!, item.extras.knoxville),
+    },
+  };
+}
+
+async function fetchWeatherDirect(pos: GeoPosition, key: string): Promise<WeatherCacheEntry> {
+  const [forecast, london, knoxville] = await Promise.all([
+    fetchOpenMeteo(pos.lat, pos.lon, { full: true }),
+    fetchExtraCity(EXTRA_CITIES[0]!),
+    fetchExtraCity(EXTRA_CITIES[1]!),
+  ]);
+
+  const homeTz =
+    forecast.timezone ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    "America/Denver";
+  const homeLabel = normalizeHomeLabel(getSettings().homeLabel);
+
+  return {
+    loc: key,
+    lat: pos.lat,
+    lon: pos.lon,
+    at: Date.now(),
+    home: { label: homeLabel, shortLabel: homeLabel, timezone: homeTz, forecast },
+    extras: { london, knoxville },
+  };
+}
+
 export async function refreshWeather(opts: { force?: boolean } = {}): Promise<void> {
   const force = opts.force ?? false;
-  const zip = normalizeZip(getSettings().zipCode);
-  if (!zip) {
-    showWeatherSetup("set zip code in settings");
-    lastWeatherZip = "";
-    return;
-  }
 
   hydrateWeatherCache();
 
+  let pos: GeoPosition;
+  try {
+    pos = await getHomePosition();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "location unavailable";
+    if (weatherCache) {
+      renderWeatherBundle(weatherCache);
+      els.wxError.hidden = false;
+      els.wxError.textContent = `stale · ${msg}`;
+    } else {
+      showWeatherSetup(msg);
+    }
+    return;
+  }
+
+  const key = locKey(pos.lat, pos.lon);
+
   // Stale-while-revalidate: paint whatever we have immediately, then only
   // hit the network when the snapshot is actually stale (or forced).
-  const cached = weatherCache?.zip === zip ? weatherCache : null;
+  const cached = weatherCache?.loc === key ? weatherCache : null;
   if (cached) {
     renderWeatherBundle(cached);
     const fresh = Date.now() - cached.at < WEATHER_CACHE_MS;
@@ -841,39 +919,14 @@ export async function refreshWeather(opts: { force?: boolean } = {}): Promise<vo
   }
 
   try {
-    const geo = await geocodeZip(zip);
-    const [forecast, london, knoxville] = await Promise.all([
-      fetchOpenMeteo(geo.lat, geo.lon, { full: true }),
-      fetchExtraCity(EXTRA_CITIES[0]!),
-      fetchExtraCity(EXTRA_CITIES[1]!),
-    ]);
-
-    const homeTz =
-      forecast.timezone ||
-      Intl.DateTimeFormat().resolvedOptions().timeZone ||
-      "America/Denver";
-
-    const home: WeatherPayload = {
-      label: geo.label,
-      shortLabel: shortPlaceLabel(geo.label),
-      timezone: homeTz,
-      forecast,
-    };
-
-    const entry: WeatherCacheEntry = {
-      zip,
-      at: Date.now(),
-      home,
-      extras: { london, knoxville },
-    };
+    const entry = (await fetchWeatherFromFeed(pos, key)) ?? (await fetchWeatherDirect(pos, key));
     weatherCache = entry;
     persistWeatherCache(entry);
-    lastWeatherZip = zip;
     renderWeatherBundle(entry);
   } catch (err) {
     console.warn("weather refresh failed", err);
     const msg = err instanceof Error ? err.message : "weather unavailable";
-    if (weatherCache?.zip === zip) {
+    if (weatherCache?.loc === key) {
       renderWeatherBundle(weatherCache);
       els.wxError.hidden = false;
       els.wxError.textContent = `stale · ${msg}`;

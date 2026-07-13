@@ -12,8 +12,6 @@
   ],
   "host_permissions": [
     "https://api.open-meteo.com/*",
-    "https://geocoding-api.open-meteo.com/*",
-    "https://api.zippopotam.us/*",
     "https://hacker-news.firebaseio.com/*",
     "https://news.ycombinator.com/*",
     "https://accounts.spotify.com/*",

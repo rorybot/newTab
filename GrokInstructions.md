@@ -48,7 +48,7 @@ Same settings dialog for first-run and later edits:
 | Field | Notes |
 |-------|--------|
 | Birth date / time | Required for life ring |
-| **Zip code** | Drives weather pane (US ZIP preferred; free Open-Meteo + zippopotam) |
+| **Home label** | Cosmetic display name for the weather pane's home city; location comes from browser geolocation, not this field |
 | Expected lifespan | Ring segments + optional death countdown |
 | Show death countdown | Toggle |
 | **Room JSON URL** | Only when `FEATURES.room` is on. One-shot snapshot JSON URL — not a live stream. Hidden while flag is off. |
@@ -59,11 +59,11 @@ Same settings dialog for first-run and later edits:
 
 ### Weather (live TUI)
 
-- Compact TUI pane driven by **zip code** in settings (same dialog as birthday)
-- **Open-Meteo** forecast (no API key) + zippopotam / geocoding for lat-lon
+- Compact TUI pane driven by **browser geolocation** (`navigator.geolocation`) — no zip/geocoding step
+- **Open-Meteo** forecast (no API key); cache key is the rounded lat/lon
 - Hero: sky glyph + large temp + place; chips for humidity, wind, UV, sunrise/sunset
 - **Next 12 hours**: temp, wind, and UV — each with colored values and a bar chart directly under that metric (no separate t/w sparkline block)
-- Refresh ~15 min; cache ~10 min; host permissions for Open-Meteo / zippopotam
+- Refresh ~15 min; cache ~10 min; host permission for Open-Meteo only
 
 ### Spotify / Now Playing (live)
 

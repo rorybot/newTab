@@ -14,10 +14,10 @@ describe("settings store", () => {
   });
 
   it("loads local extension settings over fallbacks", async () => {
-    vi.stubGlobal("chrome", makeChrome({ [STORAGE_KEY]: { zipCode: "90210" } }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ zipCode: "11111" }));
+    vi.stubGlobal("chrome", makeChrome({ [STORAGE_KEY]: { homeLabel: "Local Home" } }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ homeLabel: "Fallback Home" }));
     const store = await import("../src/settings/store");
-    expect((await store.loadSettings()).zipCode).toBe("90210");
+    expect((await store.loadSettings()).homeLabel).toBe("Local Home");
   });
 
   it("loads localStorage without extension APIs", async () => {

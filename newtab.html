@@ -83,7 +83,7 @@
           </header>
           <div class="pane-body weather-body">
             <div id="weather-setup" class="weather-setup mono">
-              <p class="muted">set zip code in settings</p>
+              <p class="muted">enable location access to show weather</p>
               <p class="muted">temp · humidity · wind · sun · 12h</p>
             </div>
             <div id="weather-live" class="weather-live mono" hidden>
@@ -425,19 +425,17 @@
         </label>
 
         <label class="field">
-          <span>Zip code</span>
+          <span>Home label (optional)</span>
           <input
             type="text"
-            id="zip-code"
-            name="zipCode"
-            inputmode="numeric"
-            placeholder="e.g. 80202"
-            autocomplete="postal-code"
-            maxlength="12"
+            id="home-label"
+            name="homeLabel"
+            placeholder="e.g. Castle Rock"
+            maxlength="40"
             spellcheck="false"
           />
         </label>
-        <p class="field-hint">Powers the weather pane (US ZIP works best; free Open-Meteo data).</p>
+        <p class="field-hint">Cosmetic name shown on the weather pane; location itself comes from the browser's geolocation permission, not this field.</p>
 
         <label class="field">
           <span>Expected lifespan (years)</span>

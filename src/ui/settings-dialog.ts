@@ -9,11 +9,7 @@ import {
   getSpotifyRedirectUriForSettings,
   onSpotifySettingsChanged,
 } from "../features/spotify/spotify-pane.js";
-import {
-  getLastWeatherZip,
-  normalizeZip,
-  refreshWeather,
-} from "../features/weather/weather-pane.js";
+import { refreshWeather } from "../features/weather/weather-pane.js";
 import { getSettings, saveSettings } from "../settings/store.js";
 import { applyBackground } from "./background.js";
 import { els } from "./refs.js";
@@ -26,7 +22,7 @@ function fillForm(): void {
   els.birthTime.value = t.length >= 8 ? t.slice(0, 8) : t.slice(0, 5);
   els.lifespan.value = String(settings.lifespan ?? 80);
   els.showDeath.checked = Boolean(settings.showDeath);
-  els.zipCode.value = settings.zipCode || "";
+  els.homeLabel.value = settings.homeLabel || "";
   els.bgImage.value = settings.bgImage || "";
   if (isFeatureEnabled("spotify")) {
     els.spotifyClientId.value = settings.spotifyClientId || "";
@@ -76,7 +72,7 @@ export function initSettingsDialog(): void {
   els.settingsForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const prev = getSettings();
-    const prevZip = normalizeZip(prev.zipCode);
+    const prevHomeLabel = (prev.homeLabel || "").trim();
     const prevRoom = (prev.roomJsonUrl || "").trim();
 
     await saveSettings({
@@ -84,7 +80,7 @@ export function initSettingsDialog(): void {
       birthTime: els.birthTime.value || "00:00:00",
       lifespan: Number(els.lifespan.value) || 80,
       showDeath: els.showDeath.checked,
-      zipCode: normalizeZip(els.zipCode.value),
+      homeLabel: (els.homeLabel.value || "").trim(),
       roomJsonUrl: isFeatureEnabled("room")
         ? readRoomSettingsField()
         : prev.roomJsonUrl,
@@ -101,10 +97,8 @@ export function initSettingsDialog(): void {
     tickLife();
 
     const next = getSettings();
-    const nextZip = normalizeZip(next.zipCode);
-    await refreshWeather({
-      force: nextZip !== prevZip || nextZip !== getLastWeatherZip(),
-    });
+    const nextHomeLabel = (next.homeLabel || "").trim();
+    await refreshWeather({ force: nextHomeLabel !== prevHomeLabel });
 
     if (isFeatureEnabled("spotify")) {
       await onSpotifySettingsChanged();

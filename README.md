@@ -63,7 +63,7 @@ npm run watch      # rebuild on change
 4. Click **Load unpacked** and select this folder
 5. Open a new tab (reload the extension after rebuilds)
 
-First launch opens settings so you can set birth date, zip, etc.
+First launch opens settings so you can set birth date, etc. The weather pane asks for browser location access on its own — no zip code needed.
 
 ## Structure
 

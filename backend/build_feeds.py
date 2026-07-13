@@ -8,7 +8,7 @@ Run it by hand or on cron; serve_feed.py (or Caddy/nginx in production)
 serves the files with CORS. See OPTIMIZATION_PLAN.md at the repo root.
 
   python build_feeds.py
-  # → out/feeds/config.json, etymology.json, anglish.json
+  # → out/feeds/config.json, etymology.json, anglish.json, hn.json, weather.json
   # extension fetches http://127.0.0.1:8765/feeds/<name>.json
 
 Feed contract (all feeds):  { "version": 1, "updatedAt": ISO-8601, "entries": [...] }
@@ -20,14 +20,21 @@ Sources:
               (anglish.fandom.com, MediaWiki API) merged with the
               Hurlebatte-Wordbook-derived map embedded in
               bark-fa/Anglish-Translator (github).
+  hn        — Algolia HN Search API, front-page tag.
+  weather   — Open-Meteo, for a fixed home lat/lon set in config.env
+              (WEATHER_LAT/WEATHER_LON) + London/Knoxville. Skipped entirely
+              (no weather.json written) until those two vars are set —
+              copy config.example.env to config.env first.
 
 Raw downloads are cached in out/cache/ (re-fetched after CACHE_MAX_AGE_H);
-delete that folder to force a full re-scrape.
+delete that folder to force a full re-scrape. Weather is not cached here —
+its own ~10 min cron cadence is the cache.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import random
 import re
 import sys
@@ -40,6 +47,20 @@ import requests
 ROOT = Path(__file__).resolve().parent
 FEEDS_DIR = ROOT / "out" / "feeds"
 CACHE_DIR = ROOT / "out" / "cache"
+
+
+def load_dotenv(path: Path) -> None:
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = val
 
 FEED_VERSION = 1
 CACHE_MAX_AGE_H = 7 * 24
@@ -330,6 +351,94 @@ def build_anglish_entries() -> list[dict]:
     return list(entries.values())
 
 
+# Fixed extra cities shown beside home in the weather pane — must match
+# EXTRA_CITIES in src/features/weather/weather-pane.ts.
+_WEATHER_EXTRA_CITIES = {
+    "london": (51.5074, -0.1278),
+    "knoxville": (35.9606, -83.9207),
+}
+
+
+def _fetch_open_meteo(lat: float, lon: float, full: bool) -> dict:
+    """Same shape/units as fetchOpenMeteo() in weather-pane.ts, so the
+    extension can drop the feed's `forecast` straight into the renderer."""
+    current_fields = (
+        ["temperature_2m", "relative_humidity_2m", "wind_speed_10m", "wind_direction_10m", "weather_code"]
+        if full
+        else ["temperature_2m", "weather_code"]
+    )
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "current": ",".join(current_fields),
+        "temperature_unit": "fahrenheit",
+        "wind_speed_unit": "mph",
+        "timezone": "auto",
+        "forecast_days": "5" if full else "1",
+    }
+    if full:
+        params["hourly"] = ",".join(
+            ["temperature_2m", "wind_speed_10m", "wind_direction_10m", "uv_index"]
+        )
+        params["daily"] = ",".join(
+            ["sunrise", "sunset", "uv_index_max", "temperature_2m_max", "wind_speed_10m_max"]
+        )
+    res = requests.get(
+        "https://api.open-meteo.com/v1/forecast",
+        params=params,
+        timeout=20,
+        headers={"User-Agent": "newTab-feed-builder (personal project)"},
+    )
+    res.raise_for_status()
+    return res.json()
+
+
+def build_weather_entry() -> list[dict]:
+    """One-entry feed: home forecast (full) + London/Knoxville current-only,
+    for a fixed home location set in config.env (WEATHER_LAT/WEATHER_LON —
+    the backend has no browser geolocation, unlike the extension). Extension
+    only trusts this feed when its own geolocated position is close to
+    (lat, lon) below — see OPTIMIZATION_PLAN.md Phase 2."""
+    lat_raw = os.environ.get("WEATHER_LAT", "").strip()
+    lon_raw = os.environ.get("WEATHER_LON", "").strip()
+    if not lat_raw or not lon_raw:
+        print("weather: WEATHER_LAT/WEATHER_LON not set; skipping", file=sys.stderr)
+        return []
+    try:
+        lat, lon = float(lat_raw), float(lon_raw)
+    except ValueError:
+        print(f"weather: bad WEATHER_LAT/WEATHER_LON ({lat_raw!r}, {lon_raw!r}); skipping", file=sys.stderr)
+        return []
+
+    try:
+        forecast = _fetch_open_meteo(lat, lon, full=True)
+        extras = {
+            name: _fetch_open_meteo(city_lat, city_lon, full=False)
+            for name, (city_lat, city_lon) in _WEATHER_EXTRA_CITIES.items()
+        }
+    except requests.RequestException as err:
+        print(f"weather: fetch failed ({err}); skipping", file=sys.stderr)
+        return []
+
+    return [
+        {
+            "lat": lat,
+            "lon": lon,
+            "timezone": forecast.get("timezone"),
+            "forecast": forecast,
+            "extras": {
+                name: {
+                    "lat": city_lat,
+                    "lon": city_lon,
+                    "timezone": extras[name].get("timezone"),
+                    "current": extras[name].get("current", {}),
+                }
+                for name, (city_lat, city_lon) in _WEATHER_EXTRA_CITIES.items()
+            },
+        }
+    ]
+
+
 def build_hn_entries() -> list[dict]:
     """Front-page stories via the Algolia HN API. Empty on network failure
     (the feed is then skipped so a previous good snapshot isn't clobbered)."""
@@ -381,13 +490,16 @@ def _write(path: Path, payload: dict) -> None:
 
 
 def main() -> int:
+    load_dotenv(ROOT / "config.env")
+    load_dotenv(ROOT / ".env")
     FEEDS_DIR.mkdir(parents=True, exist_ok=True)
 
     feeds = {
         "etymology": build_etymology_entries(),
         "anglish": build_anglish_entries(),
         "hn": build_hn_entries(),
-        # later: "weather", "room" join here — see OPTIMIZATION_PLAN.md
+        "weather": build_weather_entry(),
+        # later: "room" joins here — see OPTIMIZATION_PLAN.md
     }
 
     # Empty result = source unreachable; keep whatever snapshot is on disk.
@@ -396,7 +508,7 @@ def main() -> int:
     for name, entries in feeds.items():
         _write(FEEDS_DIR / f"{name}.json", _envelope(entries))
 
-    refresh_minutes = {"hn": 15}
+    refresh_minutes = {"hn": 15, "weather": 10}
 
     # Manifest the extension will eventually fetch first to discover feeds
     # (Phase 3); written now so the contract is settled early.

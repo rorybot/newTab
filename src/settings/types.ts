@@ -3,8 +3,9 @@ export interface Settings {
   birthTime: string;
   lifespan: number;
   showDeath: boolean;
-  /** US ZIP / postal — drives weather pane */
-  zipCode: string;
+  /** Cosmetic display name for the weather pane's home city; location itself
+   * comes from browser geolocation, not this field. */
+  homeLabel: string;
   /**
    * URL of a one-shot room snapshot JSON (recent shouts only — not a live feed).
    * Only used when FEATURES.room is enabled.
@@ -23,7 +24,7 @@ export const DEFAULTS: Settings = {
   birthTime: "00:00:00",
   lifespan: 80,
   showDeath: false,
-  zipCode: "",
+  homeLabel: "",
   roomJsonUrl: "",
   bgImage: "",
   spotifyClientId: "",

@@ -1,3 +1,20 @@
+# Backend feeds (local)
+
+## Weather feed
+
+`build_feeds.py` writes `out/feeds/weather.json` (home forecast + London/Knoxville) when `WEATHER_LAT`/`WEATHER_LON` are set in `config.env` — see `config.example.env`. Run it on a schedule (cron/supercronic) alongside `serve_feed.py`; the extension's weather pane tries this feed first and falls back to its own direct client-side fetch (geolocation + Open-Meteo) if the feed is missing, stale, or too far from the browser's geolocated position.
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp config.example.env config.env   # Windows: copy config.example.env config.env
+# edit config.env: set WEATHER_LAT / WEATHER_LON
+
+python build_feeds.py     # writes out/feeds/weather.json (+ etymology/anglish/hn)
+python serve_feed.py      # → http://127.0.0.1:8765/feeds/weather.json
+```
+
 # Room snapshot backend (local)
 
 > **Extension flag:** `FEATURES.room` is currently **off** in `src/config/features.ts` until login-aware scraping is designed. This folder is kept for experiments; the new-tab pane will not load the JSON until the flag is flipped.

@@ -22,7 +22,7 @@ export const els = {
   lifespan: requireEl<HTMLInputElement>("lifespan"),
   showDeath: requireEl<HTMLInputElement>("show-death"),
   bgImage: requireEl<HTMLInputElement>("bg-image"),
-  zipCode: requireEl<HTMLInputElement>("zip-code"),
+  homeLabel: requireEl<HTMLInputElement>("home-label"),
   weatherBadge: requireEl<HTMLElement>("weather-badge"),
   weatherSetup: requireEl<HTMLElement>("weather-setup"),
   weatherLive: requireEl<HTMLElement>("weather-live"),
