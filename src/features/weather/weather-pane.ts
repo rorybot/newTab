@@ -674,7 +674,7 @@ function isFineWindow(hour: number, minute: number): boolean {
   );
 }
 
-function sliceNext12Hours(
+export function sliceNext12Hours(
   hourly: OpenMeteoHourly,
   minutely15: OpenMeteoMinutely15 | undefined,
   timeZone: string,
@@ -694,37 +694,50 @@ function sliceNext12Hours(
   const slices: HourSlice[] = [];
   let cursor = localIsoMinute(timeZone, new Date());
 
-  // Guard against a hang if minutely_15 data doesn't cover the fine windows
-  // (Open-Meteo's minutely_15 horizon is shorter than the hourly one).
+  // Guard against a hang if both sources run out before 12 slices are found
+  // (e.g. Open-Meteo's minutely_15 horizon is shorter than the hourly one).
   for (let guard = 0; guard < 96 && slices.length < 12; guard++) {
     const hour = Number(cursor.slice(11, 13));
     const minute = Number(cursor.slice(14, 16));
 
+    let picked: HourSlice | undefined;
+    let stepMinutes = 60;
+
     if (isFineWindow(hour, minute) && minutely15) {
       const index = minutelyTimes.findIndex((t) => t !== undefined && t >= cursor);
       const time = index !== -1 ? minutelyTimes[index] : undefined;
-      if (time === undefined) break;
-      slices.push({
-        time,
-        temp: minutelyTemps[index],
-        wind: minutelyWinds[index],
-        windDir: minutelyWindDirs[index],
-        uv: minutelyUvs[index],
-      });
-      cursor = addMinutesToIso(time, 30);
-    } else {
+      if (time !== undefined) {
+        picked = {
+          time,
+          temp: minutelyTemps[index],
+          wind: minutelyWinds[index],
+          windDir: minutelyWindDirs[index],
+          uv: minutelyUvs[index],
+        };
+        stepMinutes = 30;
+      }
+    }
+
+    // Fall back to hourly if we're outside a fine window, or the fine window
+    // has no minutely data left (don't truncate the whole chart over that).
+    if (!picked) {
       const index = hourlyTimes.findIndex((t) => t !== undefined && t >= cursor);
       const time = index !== -1 ? hourlyTimes[index] : undefined;
-      if (time === undefined) break;
-      slices.push({
-        time,
-        temp: hourlyTemps[index],
-        wind: hourlyWinds[index],
-        windDir: hourlyWindDirs[index],
-        uv: hourlyUvs[index],
-      });
-      cursor = addMinutesToIso(time, 60);
+      if (time !== undefined) {
+        picked = {
+          time,
+          temp: hourlyTemps[index],
+          wind: hourlyWinds[index],
+          windDir: hourlyWindDirs[index],
+          uv: hourlyUvs[index],
+        };
+        stepMinutes = 60;
+      }
     }
+
+    if (!picked) break;
+    slices.push(picked);
+    cursor = addMinutesToIso(picked.time, stepMinutes);
   }
 
   return slices;
