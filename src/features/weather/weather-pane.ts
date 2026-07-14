@@ -50,6 +50,14 @@ interface OpenMeteoHourly {
   uv_index?: number[];
 }
 
+interface OpenMeteoMinutely15 {
+  time?: string[];
+  temperature_2m?: number[];
+  wind_speed_10m?: number[];
+  wind_direction_10m?: number[];
+  uv_index?: number[];
+}
+
 interface OpenMeteoDaily {
   time?: string[];
   sunrise?: string[];
@@ -71,6 +79,7 @@ interface OpenMeteoForecast {
   hourly?: OpenMeteoHourly;
   daily?: OpenMeteoDaily;
   timezone?: string;
+  minutely_15?: OpenMeteoMinutely15;
 }
 
 interface WeatherPayload {
@@ -581,6 +590,13 @@ async function fetchOpenMeteo(
       ),
     );
     params.set(
+      "minutely_15",
+      ["temperature_2m", "wind_speed_10m", "wind_direction_10m", "uv_index"].join(
+        ",",
+      ),
+    );
+
+    params.set(
       "daily",
       [
         "sunrise",
@@ -610,47 +626,115 @@ async function fetchExtraCity(
   };
 }
 
-function sliceNext12Hours(hourly: OpenMeteoHourly): HourSlice[] {
-  const times = hourly.time ?? [];
-  const temps = hourly.temperature_2m ?? [];
-  const winds = hourly.wind_speed_10m ?? [];
-  const windDirs = hourly.wind_direction_10m ?? [];
-  const uvs = hourly.uv_index ?? [];
+/** "YYYY-MM-DDTHH:mm" wall-clock string in `timeZone`, matching Open-Meteo's
+ * `timezone=auto` response format (no seconds, no offset) so it can be
+ * string-compared against `hourly.time` / `minutely_15.time` directly. */
+function localIsoMinute(timeZone: string, date: Date): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(date);
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+    return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+  } catch {
+    return date.toISOString().slice(0, 16);
+  }
+}
 
-  const now = Date.now();
-  let start = 0;
-  for (let i = 0; i < times.length; i++) {
-    const iso = times[i];
-    if (!iso) continue;
-    const t = new Date(iso).getTime();
-    if (!Number.isNaN(t) && t >= now - 30 * 60 * 1000) {
-      start = i;
-      break;
+/** Add minutes to a "YYYY-MM-DDTHH:mm" wall-clock string (calendar arithmetic
+ * only — not a real timezone conversion, since both sides are the same local
+ * calendar already). */
+function addMinutesToIso(iso: string, minutes: number): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso);
+  if (!m) return iso;
+  const [, y, mo, d, h, mi] = m;
+  const t =
+    Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi)) +
+    minutes * 60 * 1000;
+  const dt = new Date(t);
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}T${pad(dt.getUTCHours())}:${pad(dt.getUTCMinutes())}`;
+}
+
+/** Local time-of-day windows (commute hours) that get 30-min-resolution slices
+ * instead of hourly ones — total slice count stays 12, so these windows trade
+ * time-horizon coverage for finer resolution. */
+function isFineWindow(hour: number, minute: number): boolean {
+  return (
+    (hour === 7 && minute >= 30) ||
+    hour === 8 ||
+    (hour === 9 && minute < 30) ||
+    (hour >= 16 && hour < 19) ||
+    (hour === 19 && minute < 30)
+  );
+}
+
+function sliceNext12Hours(
+  hourly: OpenMeteoHourly,
+  minutely15: OpenMeteoMinutely15 | undefined,
+  timeZone: string,
+): HourSlice[] {
+  const hourlyTimes = hourly.time ?? [];
+  const hourlyTemps = hourly.temperature_2m ?? [];
+  const hourlyWinds = hourly.wind_speed_10m ?? [];
+  const hourlyWindDirs = hourly.wind_direction_10m ?? [];
+  const hourlyUvs = hourly.uv_index ?? [];
+
+  const minutelyTimes = minutely15?.time ?? [];
+  const minutelyTemps = minutely15?.temperature_2m ?? [];
+  const minutelyWinds = minutely15?.wind_speed_10m ?? [];
+  const minutelyWindDirs = minutely15?.wind_direction_10m ?? [];
+  const minutelyUvs = minutely15?.uv_index ?? [];
+
+  const slices: HourSlice[] = [];
+  let cursor = localIsoMinute(timeZone, new Date());
+
+  // Guard against a hang if minutely_15 data doesn't cover the fine windows
+  // (Open-Meteo's minutely_15 horizon is shorter than the hourly one).
+  for (let guard = 0; guard < 96 && slices.length < 12; guard++) {
+    const hour = Number(cursor.slice(11, 13));
+    const minute = Number(cursor.slice(14, 16));
+
+    if (isFineWindow(hour, minute) && minutely15) {
+      const index = minutelyTimes.findIndex((t) => t !== undefined && t >= cursor);
+      const time = index !== -1 ? minutelyTimes[index] : undefined;
+      if (time === undefined) break;
+      slices.push({
+        time,
+        temp: minutelyTemps[index],
+        wind: minutelyWinds[index],
+        windDir: minutelyWindDirs[index],
+        uv: minutelyUvs[index],
+      });
+      cursor = addMinutesToIso(time, 30);
+    } else {
+      const index = hourlyTimes.findIndex((t) => t !== undefined && t >= cursor);
+      const time = index !== -1 ? hourlyTimes[index] : undefined;
+      if (time === undefined) break;
+      slices.push({
+        time,
+        temp: hourlyTemps[index],
+        wind: hourlyWinds[index],
+        windDir: hourlyWindDirs[index],
+        uv: hourlyUvs[index],
+      });
+      cursor = addMinutesToIso(time, 60);
     }
-    start = i;
   }
 
-  const end = Math.min(times.length, start + 12);
-  const hours: HourSlice[] = [];
-  for (let i = start; i < end; i++) {
-    const time = times[i];
-    if (!time) continue;
-    hours.push({
-      time,
-      temp: temps[i],
-      wind: winds[i],
-      windDir: windDirs[i],
-      uv: uvs[i],
-    });
-  }
-  return hours;
+  return slices;
 }
 
 function renderWeatherBundle(entry: WeatherCacheEntry): void {
   const { home, extras } = entry;
   const forecast = home.forecast;
   const cur = forecast.current ?? {};
-  const hours = sliceNext12Hours(forecast.hourly ?? {});
+  const hours = sliceNext12Hours(forecast.hourly ?? {}, forecast.minutely_15, home.timezone);
 
   els.weatherSetup.hidden = true;
   els.weatherLive.hidden = false;

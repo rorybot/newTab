@@ -380,6 +380,9 @@ def _fetch_open_meteo(lat: float, lon: float, full: bool) -> dict:
         params["hourly"] = ",".join(
             ["temperature_2m", "wind_speed_10m", "wind_direction_10m", "uv_index"]
         )
+        params["minutely_15"] = ",".join(
+            ["temperature_2m", "wind_speed_10m", "wind_direction_10m", "uv_index"]
+        )
         params["daily"] = ",".join(
             ["sunrise", "sunset", "uv_index_max", "temperature_2m_max", "wind_speed_10m_max"]
         )
