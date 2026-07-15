@@ -4,6 +4,22 @@
 
 `build_feeds.py` writes `out/feeds/weather.json` (home forecast + London/Knoxville) when `WEATHER_LAT`/`WEATHER_LON` are set in `config.env` — see `config.example.env`. Run it on a schedule (cron/supercronic) alongside `serve_feed.py`; the extension's weather pane has no location source of its own (no geolocation, no zip) — it uses whatever `lat`/`lon` this feed reports as home. If the feed is unreachable, it falls back to a direct client-side fetch using the last coordinates a feed successfully gave it; on a fresh install that's never reached the backend, the pane just shows a "waiting on backend" message.
 
+### Deploy (Docker box)
+
+The live deployment (`docker-compose.yml` on the home server, not tracked in this repo) runs `Dockerfile` here, which bakes in only `requirements.txt` and `pull.py` — **not** `build_feeds.py`/`serve_feed.py`. Those two are fetched fresh from `main` at container start (and before every build cycle for the builder), via `python pull.py build_feeds.py serve_feed.py`. This means a `git push` to `main` reaches the deployed containers on their next 10-min cycle (builder) or next restart (server) with no manual scp/rebuild step — the old flow silently ran a stale, hand-copied `build_feeds.py` for a full day (see commit history around 2026-07-15) because nothing pulled updates in.
+
+Compose service commands (for reference):
+
+```yaml
+newtab-weather-builder:
+  command: sh -c "while true; do python pull.py build_feeds.py serve_feed.py; python build_feeds.py; sleep 600; done"
+
+newtab-weather-server:
+  command: sh -c "python pull.py serve_feed.py; python serve_feed.py --host 0.0.0.0 --port 8765 --dir /app/out"
+```
+
+Only `requirements.txt` changes still need a manual `docker compose build` on the box.
+
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
