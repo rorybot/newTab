@@ -6,7 +6,10 @@
 
 ### Deploy (Docker box)
 
-The live deployment (`docker-compose.yml` on the home server, not tracked in this repo) runs `Dockerfile` here, which bakes in only `requirements.txt` and `pull.py` — **not** `build_feeds.py`/`serve_feed.py`. Those two are fetched fresh from `main` at container start (and before every build cycle for the builder), via `python pull.py build_feeds.py serve_feed.py`. This means a `git push` to `main` reaches the deployed containers on their next 10-min cycle (builder) or next restart (server) with no manual scp/rebuild step — the old flow silently ran a stale, hand-copied `build_feeds.py` for a full day (see commit history around 2026-07-15) because nothing pulled updates in.
+The live deployment (`docker-compose.yml` on the home server, not tracked in this repo) runs `Dockerfile` here, which bakes in only `requirements.txt`, `pull.py`, and `run_server.sh` — **not** `build_feeds.py`/`serve_feed.py`. Those two are fetched fresh from `main`, via `python pull.py build_feeds.py serve_feed.py`. This means a `git push` to `main` reaches the deployed containers with no manual scp/rebuild/restart step — the old flow silently ran a stale, hand-copied `build_feeds.py` for a full day (see commit history around 2026-07-15) because nothing pulled updates in.
+
+- **`build_feeds.py`**: the builder container re-pulls it every loop iteration (10 min) before running it.
+- **`serve_feed.py`**: `run_server.sh` re-pulls it every 10 min too and, if the hash changed, kills and restarts the server process — so a push reaches the running server without a manual `docker compose restart`.
 
 Compose service commands (for reference):
 
@@ -15,10 +18,10 @@ newtab-weather-builder:
   command: sh -c "while true; do python pull.py build_feeds.py serve_feed.py; python build_feeds.py; sleep 600; done"
 
 newtab-weather-server:
-  command: sh -c "python pull.py serve_feed.py; python serve_feed.py --host 0.0.0.0 --port 8765 --dir /app/out"
+  command: sh run_server.sh
 ```
 
-Only `requirements.txt` changes still need a manual `docker compose build` on the box.
+Only `requirements.txt` or `Dockerfile` changes still need a manual `docker compose build` on the box.
 
 ```bash
 cd backend
