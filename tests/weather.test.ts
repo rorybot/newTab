@@ -148,3 +148,13 @@ describe("sliceNext12Hours", () => {
     expect(hours).toEqual([expect.objectContaining({ time: "2026-07-14T07:30" })]);
   });
 });
+
+describe("weather hour labels", () => {
+  it("shows minutes for fine-resolution forecast periods", async () => {
+    const { formatHourLabel } = await import("../src/features/weather/weather-pane");
+
+    expect(formatHourLabel("2026-07-14T07:00")).toBe("7a");
+    expect(formatHourLabel("2026-07-14T07:30")).toBe("7:30a");
+    expect(formatHourLabel("2026-07-14T16:30")).toBe("4:30p");
+  });
+});

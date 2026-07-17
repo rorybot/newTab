@@ -399,13 +399,14 @@ function renderMetricBars(
   container.replaceChildren(frag);
 }
 
-function formatHourLabel(isoLocal: string): string {
-  const m = /T(\d{2})/.exec(isoLocal);
-  if (!m?.[1]) return "—";
+export function formatHourLabel(isoLocal: string): string {
+  const m = /T(\d{2}):(\d{2})/.exec(isoLocal);
+  if (!m?.[1] || !m[2]) return "—";
   const h = Number(m[1]);
+  const minute = Number(m[2]);
   const suffix = h >= 12 ? "p" : "a";
   const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}${suffix}`;
+  return minute === 0 ? `${h12}${suffix}` : `${h12}:${m[2]}${suffix}`;
 }
 
 function formatSunTime(iso: string | undefined): string {
